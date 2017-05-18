@@ -27,23 +27,39 @@ public class StartClass {
                     public void run() {
                         Document vacPage = null;
                         try {
-                            vacPage = new Parser().getPage("https://ekb.zarplata.ru" + aURL.select("a").attr("href"));
+                            vacPage = new Parser().getPage1("https://ekb.zarplata.ru" + aURL.select("a").attr("href"));
                         } catch (IOException e) {
                             e.printStackTrace();
                         }
-                        assert vacPage != null;
-                        String name = vacPage.select("div[class=contacts_HtZXz ui list]").select("div[class=item]").first().text();
-                        System.out.println(name);
-                        urlArray.add(name);
+                        String name = null;
+                        Element element;
+                        try {
+
+                            if (vacPage != null) {
+                                Elements elements = vacPage.select("div[class=contacts_HtZXz ui list]");
+                                //System.out.println("12345 " + elements);
+                                element = elements.select("div[class=item]").first();
+                                //System.out.println(element);
+                                name = element.text();
+                                System.out.println(name);
+                            }
+                        } catch (NullPointerException e) {
+                            System.out.println("12345 " + "https://ekb.zarplata.ru" + aURL.select("a").attr("href"));
+                            e.printStackTrace();
+                        }
+
+
+                        //urlArray.add(name);
                     }
                 }).start();
+                break;
 
                 //System.out.println("https://ekb.zarplata.ru" + aURL.select("a").attr("href"));
             }
-
+            /*
             for (String url : urlArray) {
                 System.out.println(url);
-            }
+            }*/
         } catch (IOException e) {
             e.printStackTrace();
         }
