@@ -1,4 +1,4 @@
-package ru.vacancies.controllers;
+package ru.vacancies.gui.controllers;
 
 /**
  * Created by glebus on 16.05.17.
