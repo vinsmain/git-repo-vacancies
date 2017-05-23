@@ -1,10 +1,7 @@
 package ru.vacancies.parser;
 
 import com.google.gson.annotations.SerializedName;
-import ru.vacancies.parser.model.Education;
-import ru.vacancies.parser.model.Experience;
-import ru.vacancies.parser.model.Schedule;
-import ru.vacancies.parser.model.WorkingType;
+import ru.vacancies.parser.model.*;
 
 public class Vacancy {
 
@@ -13,6 +10,12 @@ public class Vacancy {
 
     @SerializedName("header")
     private String header;
+
+    @SerializedName("salary_min")
+    private int salaryMin;
+
+    @SerializedName("salary_max")
+    private int SalaryMax;
 
     @SerializedName("education")
     private Education education;
@@ -24,43 +27,43 @@ public class Vacancy {
     private WorkingType workingType;
 
     @SerializedName("schedule")
-    private Schedule shedule;
+    private Schedule schedule;
 
     @SerializedName("description")
     private String description;
 
-    public Vacancy(int ID, String header, Education education, Experience experience, WorkingType workingType, Schedule shedule, String description) {
+    @SerializedName("contact")
+    private Contact contact;
+
+    public Vacancy(int ID, String header, Education education, Experience experience, WorkingType workingType, Schedule schedule, String description, Contact contact) {
         this.id = ID;
         this.header = header;
         this.education = education;
         this.experience = experience;
         this.workingType = workingType;
-        this.shedule = shedule;
+        this.schedule = schedule;
         this.description = description;
+        this.contact = contact;
     }
 
     public int getId() {
         return id;
     }
 
-    public void setId(int id) {
-        this.id = id;
-    }
-
     public String getHeader() {
         return header;
     }
 
-    public void setHeader(String header) {
-        this.header = header;
+    public int getSalaryMin() {
+        return salaryMin;
+    }
+
+    public int getSalaryMax() {
+        return SalaryMax;
     }
 
     public Education getEducation() {
         return education;
-    }
-
-    public void setEducation(Education education) {
-        this.education = education;
     }
 
     public Experience getExperience() {
@@ -71,11 +74,15 @@ public class Vacancy {
         return workingType;
     }
 
-    public Schedule getShedule() {
-        return shedule;
+    public Schedule getSchedule() {
+        return schedule;
     }
 
     public String getDescription() {
         return description;
+    }
+
+    public Contact getContact() {
+        return contact;
     }
 }

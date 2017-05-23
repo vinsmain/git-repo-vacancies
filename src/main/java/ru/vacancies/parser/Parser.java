@@ -1,6 +1,8 @@
 package ru.vacancies.parser;
 
 import com.google.gson.Gson;
+import ru.vacancies.parser.model.ContactPhone;
+
 import java.io.BufferedReader;
 import java.io.InputStreamReader;
 import java.lang.reflect.Field;
@@ -8,7 +10,8 @@ import java.net.URL;
 
 public class Parser {
     /*
-    //https://api.zp.ru/v1/vacancies?offset=0&geo_id=994&limit=50 API НЕ УДАЛЯТЬ!!!
+    //https://api.zp.ru/v1/vacancies?offset=0&geo_id=994&limit=50 - API списка вакансий
+    //https://api.zp.ru/v1/vacancies/79125333?geo_id=994 - API одной вакансии
     */
 
     public VacancyList getJSON(String url) {
@@ -16,6 +19,17 @@ public class Parser {
             String json = readUrl(url);
             System.out.println(json);
             return new Gson().fromJson(json, VacancyList.class);
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+        return null;
+    }
+
+    public ContactPhone parseContactPhone(String url) {
+        try {
+            String json = readUrl(url);
+            //System.out.println(json);
+            return new Gson().fromJson(json, ContactPhone.class);
         } catch (Exception e) {
             e.printStackTrace();
         }
@@ -37,15 +51,17 @@ public class Parser {
         }
     }
 
-    public void checkVacancy(Vacancy vacancy) {
-        Class c = vacancy.getClass();
+    public void checkVacancy(Object obj) {
+        Class c = obj.getClass();
         Field[] publicFields = c.getDeclaredFields();
         for (Field field : publicFields) {
             field.setAccessible(true);
             Class fieldType = field.getType();
             try {
-                if (field.get(vacancy) == null) {
-                    field.set(vacancy, fieldType.newInstance());
+                if (field.get(obj) == null) {
+                    field.set(obj, fieldType.newInstance());
+                } else if (fieldType.getSimpleName().equals("Contact")) {
+                    checkVacancy(field.get(obj));
                 }
             } catch (IllegalAccessException | InstantiationException e) {
                 e.printStackTrace();
