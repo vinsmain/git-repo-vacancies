@@ -2,23 +2,26 @@ package ru.vacancies.parser;
 
 import com.google.gson.Gson;
 import ru.vacancies.parser.model.ContactPhone;
-
 import java.io.BufferedReader;
 import java.io.FileNotFoundException;
 import java.io.InputStreamReader;
 import java.lang.reflect.Field;
 import java.net.URL;
+import java.util.concurrent.*;
 
 public class Parser {
     /*
-    //https://api.zp.ru/v1/vacancies?offset=0&geo_id=994&limit=50 - API списка вакансий
-    //https://api.zp.ru/v1/vacancies/79125333?geo_id=994 - API одной вакансии
+    // https://api.zp.ru/v1/vacancies?offset=0&geo_id=994&limit=0 - API количества вакансий в списке
+    // https://api.zp.ru/v1/vacancies?offset=0&geo_id=994&limit=50 - API списка вакансий
+    // https://api.zp.ru/v1/vacancies/79125333?geo_id=994 - API одной вакансии
     */
+
+    private CopyOnWriteArrayList<Vacancy> vacanciesList = new CopyOnWriteArrayList<>();
 
     public VacancyIDList getJSON(String url) {
         try {
             String json = readUrl(url);
-            System.out.println(json);
+            //System.out.println(json);
             return new Gson().fromJson(json, VacancyIDList.class);
         } catch (Exception e) {
             e.printStackTrace();
@@ -48,6 +51,7 @@ public class Parser {
             while ((read = reader.read(chars)) != -1) buffer.append(chars, 0, read);
             return buffer.toString();
         } catch (FileNotFoundException e){
+            System.out.println(urlString);
             return null;
         } finally {
             if (reader != null) reader.close();
@@ -76,5 +80,64 @@ public class Parser {
 
     public void checkPhoneList(Vacancy vacancy) {
         if (vacancy.getContact().getPhone().isEmpty()) vacancy.getContact().getPhone().add(new ContactPhone());
+    }
+
+    public void parseVacancy(VacancyIDList vacancyIDList) {
+        ExecutorService service = Executors.newFixedThreadPool(10);
+        CountDownLatch cdl = new CountDownLatch(vacancyIDList.list.size());
+        for (VacancyID vacancyID : vacancyIDList.list) {
+            service.submit((Runnable) () -> {
+                Vacancy vacancy = (getVacancy("https://api.zp.ru/v1/vacancies/" + vacancyID.getId() + "?geo_id=994").list.get(0));
+                checkVacancy(vacancy);
+                checkPhoneList(vacancy);
+                vacanciesList.add(vacancy);
+                cdl.countDown();
+            });
+        }
+        try {
+            cdl.await();
+            service.shutdown();
+        } catch (InterruptedException e) {
+            e.printStackTrace();
+        }
+    }
+
+    public void parseVacancyIDList() {
+        int count = getJSON("https://api.zp.ru/v1/vacancies?offset=0&geo_id=994&limit=0").metaData.getResultSet().getCount() / 100 * 100;
+        System.out.println(count);
+        CountDownLatch cdl = new CountDownLatch(count / 100 + 1);
+        ExecutorService serviceParsingID = Executors.newFixedThreadPool(3);
+        ExecutorService serviceParsingVacancies = Executors.newFixedThreadPool(10);
+        int offset = 0;
+        do {
+            final int finalOffset = offset;
+            serviceParsingID.submit((Runnable) () -> {
+                VacancyIDList array = getJSON("https://api.zp.ru/v1/vacancies?offset=" + finalOffset + "&geo_id=994&limit=100");
+                serviceParsingVacancies.submit((Runnable) () -> {
+                    parseVacancy(array);
+                    cdl.countDown();
+                });
+            });
+            offset += 100;
+            System.out.println(offset);
+        } while (offset <= count);
+        try {
+            cdl.await(30000, TimeUnit.MILLISECONDS);
+            serviceParsingID.shutdown();
+            serviceParsingVacancies.shutdown();
+        } catch (InterruptedException e) {
+            e.printStackTrace();
+        }
+
+        System.out.println("Array size: " + vacanciesList.size());
+    }
+
+    public void printVacancyListInfo(VacancyList vacancies) {
+        for (Vacancy vacancy : vacancies.list) {
+            System.out.println(vacancy.getId() + " " + vacancy.getHeader() + " " + vacancy.getEducation().getId() + vacancy.getEducation().getTitle() + " " + vacancy.getExperience().getId() + vacancy.getExperience().getTitle() +
+                    " " + vacancy.getWorkingType().getId() + vacancy.getWorkingType().getTitle() + " " + vacancy.getSchedule().getId() + vacancy.getSchedule().getTitle() + " " + vacancy.getContact().getName() +
+                    " " + vacancy.getContact().getPhone().get(0).getPhone() + " " + vacancy.getContact().getCity().getTitle() + " " + vacancy.getContact().getSubway().getTitle() + " " + vacancy.getContact().getStreet() +
+                    " " + vacancy.getContact().getBuilding() + " " + vacancy.getSalaryMin() + " " + vacancy.getSalaryMax());
+        }
     }
 }
