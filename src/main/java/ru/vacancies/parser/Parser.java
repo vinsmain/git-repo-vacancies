@@ -4,6 +4,7 @@ import com.google.gson.Gson;
 import ru.vacancies.parser.model.ContactPhone;
 import java.io.BufferedReader;
 import java.io.FileNotFoundException;
+import java.io.IOException;
 import java.io.InputStreamReader;
 import java.lang.reflect.Field;
 import java.net.URL;
@@ -51,9 +52,12 @@ public class Parser {
             while ((read = reader.read(chars)) != -1) buffer.append(chars, 0, read);
             return buffer.toString();
         } catch (FileNotFoundException e){
-            System.out.println(urlString);
-            return null;
-        } finally {
+            System.out.println("1 " + urlString);
+            return readUrl(urlString);
+        } catch (IOException e) {
+            System.out.println("2 " + urlString);
+            return readUrl(urlString);
+        } finally{
             if (reader != null) reader.close();
         }
     }
@@ -106,7 +110,7 @@ public class Parser {
         int count = getJSON("https://api.zp.ru/v1/vacancies?offset=0&geo_id=994&limit=0").metaData.getResultSet().getCount() / 100 * 100;
         System.out.println(count);
         CountDownLatch cdl = new CountDownLatch(count / 100 + 1);
-        ExecutorService serviceParsingID = Executors.newFixedThreadPool(3);
+        ExecutorService serviceParsingID = Executors.newFixedThreadPool(10);
         ExecutorService serviceParsingVacancies = Executors.newFixedThreadPool(10);
         int offset = 0;
         do {
@@ -119,7 +123,6 @@ public class Parser {
                 });
             });
             offset += 100;
-            System.out.println(offset);
         } while (offset <= count);
         try {
             cdl.await(30000, TimeUnit.MILLISECONDS);
@@ -128,16 +131,18 @@ public class Parser {
         } catch (InterruptedException e) {
             e.printStackTrace();
         }
-
         System.out.println("Array size: " + vacanciesList.size());
+        printVacancyListInfo(vacanciesList);
     }
 
-    public void printVacancyListInfo(VacancyList vacancies) {
-        for (Vacancy vacancy : vacancies.list) {
-            System.out.println(vacancy.getId() + " " + vacancy.getHeader() + " " + vacancy.getEducation().getId() + vacancy.getEducation().getTitle() + " " + vacancy.getExperience().getId() + vacancy.getExperience().getTitle() +
+    public void printVacancyListInfo(CopyOnWriteArrayList<Vacancy> vacanciesList) {
+        int i = 1;
+        for (Vacancy vacancy : vacanciesList) {
+            System.out.println(i + " " + vacancy.getId() + " " + vacancy.getHeader() + " " + vacancy.getEducation().getId() + vacancy.getEducation().getTitle() + " " + vacancy.getExperience().getId() + vacancy.getExperience().getTitle() +
                     " " + vacancy.getWorkingType().getId() + vacancy.getWorkingType().getTitle() + " " + vacancy.getSchedule().getId() + vacancy.getSchedule().getTitle() + " " + vacancy.getContact().getName() +
                     " " + vacancy.getContact().getPhone().get(0).getPhone() + " " + vacancy.getContact().getCity().getTitle() + " " + vacancy.getContact().getSubway().getTitle() + " " + vacancy.getContact().getStreet() +
-                    " " + vacancy.getContact().getBuilding() + " " + vacancy.getSalaryMin() + " " + vacancy.getSalaryMax());
+                    " " + vacancy.getContact().getBuilding() + " " + vacancy.getSalaryMin() + " " + vacancy.getSalaryMax() + " " + vacancy.getDateTime() + " " + vacancy.getCompany().getTitle());
+            i++;
         }
     }
 }

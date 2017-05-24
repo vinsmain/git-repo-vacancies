@@ -35,7 +35,13 @@ public class Vacancy {
     @SerializedName("contact")
     private Contact contact;
 
-    public Vacancy(int ID, String header, Education education, Experience experience, WorkingType workingType, Schedule schedule, String description, Contact contact) {
+    @SerializedName("mod_date")
+    private String dateTime;
+
+    @SerializedName("company")
+    private Company company;
+
+    public Vacancy(int ID, String header, Education education, Experience experience, WorkingType workingType, Schedule schedule, String description, Contact contact, String dateTime, Company company) {
         this.id = ID;
         this.header = header;
         this.education = education;
@@ -44,6 +50,8 @@ public class Vacancy {
         this.schedule = schedule;
         this.description = description;
         this.contact = contact;
+        this.dateTime = dateTime;
+        this.company = company;
     }
 
     public int getId() {
@@ -84,5 +92,13 @@ public class Vacancy {
 
     public Contact getContact() {
         return contact;
+    }
+
+    public String getDateTime() {
+        return dateTime;
+    }
+
+    public Company getCompany() {
+        return company;
     }
 }
