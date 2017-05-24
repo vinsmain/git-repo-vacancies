@@ -4,6 +4,7 @@ import com.google.gson.Gson;
 import ru.vacancies.parser.model.ContactPhone;
 
 import java.io.BufferedReader;
+import java.io.FileNotFoundException;
 import java.io.InputStreamReader;
 import java.lang.reflect.Field;
 import java.net.URL;
@@ -14,22 +15,22 @@ public class Parser {
     //https://api.zp.ru/v1/vacancies/79125333?geo_id=994 - API одной вакансии
     */
 
-    public VacancyList getJSON(String url) {
+    public VacancyIDList getJSON(String url) {
         try {
             String json = readUrl(url);
             System.out.println(json);
-            return new Gson().fromJson(json, VacancyList.class);
+            return new Gson().fromJson(json, VacancyIDList.class);
         } catch (Exception e) {
             e.printStackTrace();
         }
         return null;
     }
 
-    public ContactPhone parseContactPhone(String url) {
+    public VacancyList getVacancy(String url) {
         try {
             String json = readUrl(url);
             //System.out.println(json);
-            return new Gson().fromJson(json, ContactPhone.class);
+            return new Gson().fromJson(json, VacancyList.class);
         } catch (Exception e) {
             e.printStackTrace();
         }
@@ -46,6 +47,8 @@ public class Parser {
             char[] chars = new char[1024];
             while ((read = reader.read(chars)) != -1) buffer.append(chars, 0, read);
             return buffer.toString();
+        } catch (FileNotFoundException e){
+            return null;
         } finally {
             if (reader != null) reader.close();
         }
@@ -62,10 +65,16 @@ public class Parser {
                     field.set(obj, fieldType.newInstance());
                 } else if (fieldType.getSimpleName().equals("Contact")) {
                     checkVacancy(field.get(obj));
+                } else if (fieldType.getSimpleName().equals("ArrayList<ContactPhone>")) {
+                    checkVacancy(field.get(obj));
                 }
             } catch (IllegalAccessException | InstantiationException e) {
                 e.printStackTrace();
             }
         }
+    }
+
+    public void checkPhoneList(Vacancy vacancy) {
+        if (vacancy.getContact().getPhone().isEmpty()) vacancy.getContact().getPhone().add(new ContactPhone());
     }
 }

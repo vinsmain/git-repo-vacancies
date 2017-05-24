@@ -4,8 +4,16 @@ import com.google.gson.annotations.SerializedName;
 
 public class ContactPhone {
 
-    @SerializedName("user_type")
+    @SerializedName("phone")
     public String phone;
+
+    public ContactPhone() {
+        this.phone = null;
+    }
+
+    public ContactPhone(String phone) {
+        this.phone = phone;
+    }
 
     public String getPhone() {
         return phone;
