@@ -53,7 +53,7 @@ public class Parser {
             return buffer.toString();
         } catch (FileNotFoundException e){
             System.out.println("1 " + urlString);
-            return readUrl(urlString);
+            return null;
         } catch (IOException e) {
             System.out.println("2 " + urlString);
             return readUrl(urlString);
@@ -125,7 +125,7 @@ public class Parser {
             offset += 100;
         } while (offset <= count);
         try {
-            cdl.await(30000, TimeUnit.MILLISECONDS);
+            cdl.await(60000, TimeUnit.MILLISECONDS);
             serviceParsingID.shutdown();
             serviceParsingVacancies.shutdown();
         } catch (InterruptedException e) {
