@@ -1,6 +1,7 @@
 package ru.vacancies.parser;
 
 import com.google.gson.Gson;
+import ru.vacancies.database.DataBase;
 import ru.vacancies.parser.model.ContactPhone;
 import java.io.BufferedReader;
 import java.io.FileNotFoundException;
@@ -132,7 +133,12 @@ public class Parser {
             e.printStackTrace();
         }
         System.out.println("Array size: " + vacanciesList.size());
-        printVacancyListInfo(vacanciesList);
+        //printVacancyListInfo(vacanciesList);
+        DataBase dataBase = new DataBase();
+        dataBase.insert(vacanciesList);
+
+        dataBase.disconnect();
+        System.out.println("Done!");
     }
 
     public void printVacancyListInfo(CopyOnWriteArrayList<Vacancy> vacanciesList) {

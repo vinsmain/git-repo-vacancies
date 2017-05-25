@@ -28,3 +28,4 @@ src/main/resources/database/
 target/classes/database/
 target/classes/ru/
 target/generated-sources/
+target/classes/fxml/

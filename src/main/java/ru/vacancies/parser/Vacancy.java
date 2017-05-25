@@ -15,7 +15,7 @@ public class Vacancy {
     private int salaryMin;
 
     @SerializedName("salary_max")
-    private int SalaryMax;
+    private int salaryMax;
 
     @SerializedName("education")
     private Education education;
@@ -41,7 +41,7 @@ public class Vacancy {
     @SerializedName("company")
     private Company company;
 
-    public Vacancy(int ID, String header, Education education, Experience experience, WorkingType workingType, Schedule schedule, String description, Contact contact, String dateTime, Company company) {
+    public Vacancy(int ID, String header, Education education, Experience experience, WorkingType workingType, Schedule schedule, String description, Contact contact, String dateTime, Company company, int salaryMin, int salaryMax) {
         this.id = ID;
         this.header = header;
         this.education = education;
@@ -52,6 +52,8 @@ public class Vacancy {
         this.contact = contact;
         this.dateTime = dateTime;
         this.company = company;
+        this.salaryMin = salaryMin;
+        this.salaryMax = salaryMax;
     }
 
     public int getId() {
@@ -67,7 +69,7 @@ public class Vacancy {
     }
 
     public int getSalaryMax() {
-        return SalaryMax;
+        return salaryMax;
     }
 
     public Education getEducation() {
