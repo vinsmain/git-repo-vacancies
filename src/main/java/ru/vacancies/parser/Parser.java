@@ -9,6 +9,7 @@ import java.io.IOException;
 import java.io.InputStreamReader;
 import java.lang.reflect.Field;
 import java.net.URL;
+import java.sql.SQLException;
 import java.util.concurrent.*;
 
 public class Parser {
@@ -135,8 +136,27 @@ public class Parser {
         System.out.println("Array size: " + vacanciesList.size());
         //printVacancyListInfo(vacanciesList);
         DataBase dataBase = new DataBase();
-        dataBase.insert(vacanciesList);
-
+        Vacancy vac = null;
+        try {
+            int i = 0;
+            dataBase.getConn().setAutoCommit(false);
+            for (Vacancy vacancy : vacanciesList) {
+                vac = vacancy;
+                if (dataBase.checkUpdate(vacancy)) {
+                    dataBase.insert(vacancy);
+                    //dataBase.getInsert().addBatch();
+                }
+                i++;
+                if (i % 1000 == 0 || i == vacanciesList.size()) {
+                    System.out.println(i);
+                    //dataBase.getInsert().executeBatch();
+                    dataBase.getConn().commit();
+                }
+            }
+        } catch (SQLException e) {
+            System.out.println(vac.getId());
+            e.printStackTrace();
+        }
         dataBase.disconnect();
         System.out.println("Done!");
     }
