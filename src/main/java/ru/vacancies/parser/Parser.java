@@ -54,10 +54,10 @@ public class Parser {
             while ((read = reader.read(chars)) != -1) buffer.append(chars, 0, read);
             return buffer.toString();
         } catch (FileNotFoundException e){
-            System.out.println("1 " + urlString);
+            System.out.println("Страница не найдена: " + urlString);
             return null;
         } catch (IOException e) {
-            System.out.println("2 " + urlString);
+            System.out.println("Ошибка открытия страницы. Повторная попытка: " + urlString);
             return readUrl(urlString);
         } finally{
             if (reader != null) reader.close();
@@ -133,32 +133,55 @@ public class Parser {
         } catch (InterruptedException e) {
             e.printStackTrace();
         }
-        System.out.println("Array size: " + vacanciesList.size());
-        //printVacancyListInfo(vacanciesList);
+        System.out.println("Парсинг завершен. Всего вакансий: " + vacanciesList.size());
+        updateDataBase(vacanciesList);
+    }
+
+    public void updateDataBase(CopyOnWriteArrayList<Vacancy> vacanciesList) {
         DataBase dataBase = new DataBase();
+        int countAll = 0;
+        int countAdd = 0;
+        int countUpdate = 0;
+        int countDelete = 0;
         Vacancy vac = null;
         try {
             int i = 0;
             dataBase.getConn().setAutoCommit(false);
             for (Vacancy vacancy : vacanciesList) {
                 vac = vacancy;
-                if (dataBase.checkUpdate(vacancy)) {
+                int status = dataBase.checkUpdate(vacancy);
+                if (status == 0) {
                     dataBase.insert(vacancy);
-                    //dataBase.getInsert().addBatch();
+                    dataBase.getInsert().addBatch();
+                    countAdd++;
+                } else if (status == 1) {
+                    dataBase.update(vacancy);
+                    dataBase.getUpdate().addBatch();
+                    countUpdate++;
+                } else if (status == 2) {
+                    dataBase.updateStatus(vacancy, 1);
+                    dataBase.getUpdateStatus().addBatch();
                 }
                 i++;
                 if (i % 1000 == 0 || i == vacanciesList.size()) {
                     System.out.println(i);
-                    //dataBase.getInsert().executeBatch();
+                    dataBase.getInsert().executeBatch();
+                    dataBase.getUpdate().executeBatch();
+                    dataBase.getUpdateStatus().executeBatch();
                     dataBase.getConn().commit();
                 }
             }
+            countDelete = dataBase.delete(0);
+            countAll = dataBase.getCountAll();
         } catch (SQLException e) {
-            System.out.println(vac.getId());
+            System.out.println(vac != null ? vac.getId() : 0);
             e.printStackTrace();
         }
         dataBase.disconnect();
-        System.out.println("Done!");
+        System.out.println("Всего вакансий в базе: " + countAll);
+        System.out.println("Добавлено: " + countAdd);
+        System.out.println("Обновлено: " + countUpdate);
+        System.out.println("Удалено: " + countDelete);
     }
 
     public void printVacancyListInfo(CopyOnWriteArrayList<Vacancy> vacanciesList) {

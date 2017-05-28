@@ -1,21 +1,28 @@
 package ru.vacancies.database;
 
 import ru.vacancies.parser.Vacancy;
+import ru.vacancies.parser.metadata.*;
 
 import java.sql.*;
+import java.sql.ResultSet;
 
 public class DataBase {
 
     /*
     // Update_Status
-    // 0 - for delete
-    // 1 - no update
-    // 2 - update
+    // 0 - no update
+    // 1 - update
     */
 
     private Connection conn;
     private PreparedStatement insert;
     private PreparedStatement checkUpdate;
+    private PreparedStatement update;
+    private PreparedStatement updateStatus;
+    private PreparedStatement updateStatusArterParsing;
+    private PreparedStatement delete;
+    private PreparedStatement countAll;
+    private PreparedStatement countDelete;
 
     public DataBase() {
         connect();
@@ -40,6 +47,12 @@ public class DataBase {
 
             insert = conn.prepareStatement("INSERT INTO Vacancy(ID, Header, Date_Time, Min_Salary, Max_Salary, Company_ID, WorkingType_ID, Shedule_ID, Update_Status) VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?)");
             checkUpdate = conn.prepareStatement("SELECT ID, Date_Time FROM Vacancy WHERE ID = ?");
+            update = conn.prepareStatement("UPDATE Vacancy SET Header = ?, Date_Time = ?, Min_Salary = ?, Max_Salary = ?, Company_ID = ?, WorkingType_ID = ?, Shedule_ID = ?, Update_Status = ? WHERE ID = ?;");
+            updateStatus = conn.prepareStatement("UPDATE Vacancy SET Update_Status = ? WHERE ID = ?;");
+            updateStatusArterParsing = conn.prepareStatement("UPDATE Vacancy SET Update_Status = ?");
+            delete = conn.prepareStatement("DELETE FROM Vacancy WHERE Update_Status = ?");
+            countAll = conn.prepareStatement("SELECT COUNT(*) FROM Vacancy");
+            //countDelete = conn.prepareStatement("SELECT ROW_COUNT() FROM Vacancy");
         } catch (Exception e) {
             System.out.println("Ошибка инициализации JDBC драйвера");
             e.printStackTrace();
@@ -56,16 +69,14 @@ public class DataBase {
             insert.setInt(6, vacancy.getCompany().getId());
             insert.setInt(7, vacancy.getWorkingType().getId());
             insert.setInt(8, vacancy.getSchedule().getId());
-            insert.setInt(9, 2);
-            //insert.addBatch();
-            //insert.executeBatch();
-            insert.executeUpdate();
+            insert.setInt(9, 1);
         } catch (SQLException e) {
             e.printStackTrace();
         }
     }
 
-    public boolean checkUpdate(Vacancy vacancy) {
+    // return 0 - insert new vacancy, 1 - update vacancy, 2 - skip vacancy
+    public int checkUpdate(Vacancy vacancy) {
         try {
             checkUpdate.setInt(1, vacancy.getId());
             ResultSet resultSet = checkUpdate.executeQuery();
@@ -74,13 +85,67 @@ public class DataBase {
                 dateTime = resultSet.getString("Date_Time");
             }
             if (dateTime != null && !vacancy.getDateTime().equals(dateTime)) {
-                return false;
-            } else if (dateTime == null) return true;
-            //return !vacancy.getDateTime().equals(dateTime);
+                return 1;
+            } else if (dateTime != null && vacancy.getDateTime().equals(dateTime)) {
+                return 2;
+            } else if (dateTime == null) return 0;
         } catch (SQLException e) {
-            return true;
+            e.printStackTrace();
+            return 2;
         }
-        return false;
+        return 2;
+    }
+
+    public void update(Vacancy vacancy) {
+        try {
+            update.setString(1, vacancy.getHeader());
+            update.setString(2, vacancy.getDateTime());
+            update.setInt(3, vacancy.getSalaryMin());
+            update.setInt(4, vacancy.getSalaryMax());
+            update.setInt(5, vacancy.getCompany().getId());
+            update.setInt(6, vacancy.getWorkingType().getId());
+            update.setInt(7, vacancy.getSchedule().getId());
+            update.setInt(8, 1);
+            update.setInt(9, vacancy.getId());
+        } catch (SQLException e) {
+            e.printStackTrace();
+        }
+    }
+
+    public void updateStatus(Vacancy vacancy, int status) {
+        try {
+            updateStatus.setInt(1, status);
+            updateStatus.setInt(2, vacancy.getId());
+        } catch (SQLException e) {
+            e.printStackTrace();
+        }
+    }
+
+    public int delete(int status) {
+        int count = 0;
+        try {
+            conn.setAutoCommit(false);
+            delete.setInt(1, status);
+            count = delete.executeUpdate();
+            updateStatusArterParsing.setInt(1, status);
+            updateStatusArterParsing.executeUpdate();
+            conn.commit();
+        } catch (SQLException e) {
+            e.printStackTrace();
+        }
+        return count;
+    }
+
+    public int getCountAll() {
+        int count = 0;
+        try {
+            ResultSet resultSet = countAll.executeQuery();
+            resultSet.next();
+            count = resultSet.getInt(1);
+        } catch (SQLException e) {
+            e.printStackTrace();
+        }
+        return count;
     }
 
     public void disconnect() {
@@ -97,5 +162,17 @@ public class DataBase {
 
     public PreparedStatement getInsert() {
         return insert;
+    }
+
+    public PreparedStatement getUpdate() {
+        return update;
+    }
+
+    public PreparedStatement getUpdateStatus() {
+        return updateStatus;
+    }
+
+    public PreparedStatement getDelete() {
+        return delete;
     }
 }
