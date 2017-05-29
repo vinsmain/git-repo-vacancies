@@ -153,10 +153,12 @@ public class Parser {
                 if (status == 0) {
                     dataBase.insert(vacancy);
                     dataBase.getInsert().addBatch();
+                    dataBase.getInsertContact().addBatch();
                     countAdd++;
                 } else if (status == 1) {
                     dataBase.update(vacancy);
                     dataBase.getUpdate().addBatch();
+                    dataBase.getUpdateContact().addBatch();
                     countUpdate++;
                 } else if (status == 2) {
                     dataBase.updateStatus(vacancy, 1);
@@ -166,7 +168,9 @@ public class Parser {
                 if (i % 1000 == 0 || i == vacanciesList.size()) {
                     System.out.println(i);
                     dataBase.getInsert().executeBatch();
+                    dataBase.getInsertContact().executeBatch();
                     dataBase.getUpdate().executeBatch();
+                    dataBase.getUpdateContact().executeBatch();
                     dataBase.getUpdateStatus().executeBatch();
                     dataBase.getConn().commit();
                 }

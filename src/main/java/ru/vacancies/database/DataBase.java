@@ -18,8 +18,13 @@ public class DataBase {
     private PreparedStatement update;
     private PreparedStatement updateStatus;
     private PreparedStatement updateStatusAfterParsing;
+    private PreparedStatement selectForDelete;
     private PreparedStatement delete;
     private PreparedStatement countAll;
+
+    private PreparedStatement insertContact;
+    private PreparedStatement updateContact;
+    private PreparedStatement deleteContact;
 
     public DataBase() {
         connect();
@@ -34,20 +39,28 @@ public class DataBase {
                     "Company_ID INTEGER NOT NULL REFERENCES Company (ID), WorkingType_ID INTEGER NOT NULL REFERENCES WorkingType (ID), " +
                     "Shedule_ID INTEGER NOT NULL REFERENCES Shedule (ID), Description TEXT, Education_ID INTEGER NOT NULL REFERENCES Education (ID), " +
                     "Experience_ID INTEGER NOT NULL REFERENCES Experience (ID), Update_Status INTEGER NOT NULL)");
-            stmt.executeUpdate("CREATE TABLE IF NOT EXISTS Contacts (ID INTEGER PRIMARY KEY NOT NULL, Title TEXT, City TEXT, Subway TEXT, Street TEXT, Building TEXT, Phone TEXT)");
+            stmt.executeUpdate("CREATE TABLE IF NOT EXISTS Contacts (ID INTEGER PRIMARY KEY NOT NULL, Title TEXT, City_ID INTEGER NOT NULL REFERENCES City (ID), Subway_ID INTEGER NOT NULL REFERENCES Subway (ID), Street TEXT, Building TEXT, Phone TEXT)");
             stmt.executeUpdate("CREATE TABLE IF NOT EXISTS Company (ID INTEGER PRIMARY KEY NOT NULL, Title TEXT)");
             stmt.executeUpdate("CREATE TABLE IF NOT EXISTS WorkingType (ID INTEGER PRIMARY KEY NOT NULL, Title TEXT)");
             stmt.executeUpdate("CREATE TABLE IF NOT EXISTS Shedule (ID INTEGER PRIMARY KEY NOT NULL, Title TEXT)");
             stmt.executeUpdate("CREATE TABLE IF NOT EXISTS Education (ID INTEGER PRIMARY KEY NOT NULL, Title TEXT)");
             stmt.executeUpdate("CREATE TABLE IF NOT EXISTS Experience (ID INTEGER PRIMARY KEY NOT NULL, Title TEXT)");
+            stmt.executeUpdate("CREATE TABLE IF NOT EXISTS City (ID INTEGER PRIMARY KEY NOT NULL, Title TEXT)");
+            stmt.executeUpdate("CREATE TABLE IF NOT EXISTS Subway (ID INTEGER PRIMARY KEY NOT NULL, Title TEXT)");
 
             insert = conn.prepareStatement("INSERT INTO Vacancy(ID, Header, Date_Time, Min_Salary, Max_Salary, Company_ID, WorkingType_ID, Shedule_ID, Description, Education_ID, Experience_ID, Update_Status) VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
             checkUpdate = conn.prepareStatement("SELECT ID, Date_Time FROM Vacancy WHERE ID = ?");
             update = conn.prepareStatement("UPDATE Vacancy SET Header = ?, Date_Time = ?, Min_Salary = ?, Max_Salary = ?, Company_ID = ?, WorkingType_ID = ?, Shedule_ID = ?, Description = ?, Education_ID = ?, Experience_ID = ?, Update_Status = ? WHERE ID = ?");
             updateStatus = conn.prepareStatement("UPDATE Vacancy SET Update_Status = ? WHERE ID = ?");
             updateStatusAfterParsing = conn.prepareStatement("UPDATE Vacancy SET Update_Status = ?");
-            delete = conn.prepareStatement("DELETE FROM Vacancy WHERE Update_Status = ?");
+            selectForDelete = conn.prepareStatement("SELECT * FROM Vacancy WHERE Update_Status = ?");
+            delete = conn.prepareStatement("DELETE FROM Vacancy WHERE ID = ?");
             countAll = conn.prepareStatement("SELECT COUNT(*) FROM Vacancy");
+
+            insertContact = conn.prepareStatement("INSERT INTO Contacts(ID, Title, City_ID, Subway_ID, Street, Building, Phone) VALUES(?, ?, ?, ?, ?, ?, ?)");
+            updateContact = conn.prepareStatement("UPDATE Contacts SET Title = ?, City_ID = ?, Subway_ID = ?, Street = ?, Building = ?, Phone = ? WHERE ID = ?");
+            deleteContact = conn.prepareStatement("DELETE FROM Contacts WHERE ID = ?");
+
         } catch (Exception e) {
             System.out.println("Ошибка инициализации JDBC драйвера");
             e.printStackTrace();
@@ -68,6 +81,14 @@ public class DataBase {
             insert.setInt(10, vacancy.getEducation().getId());
             insert.setInt(11, vacancy.getExperience().getId());
             insert.setInt(12, 1);
+
+            insertContact.setInt(1, vacancy.getId());
+            insertContact.setString(2, vacancy.getContact().getName());
+            insertContact.setInt(3, vacancy.getContact().getCity().getId());
+            insertContact.setInt(4, vacancy.getContact().getSubway().getId());
+            insertContact.setString(5, vacancy.getContact().getStreet());
+            insertContact.setString(6, vacancy.getContact().getBuilding());
+            insertContact.setString(7, vacancy.getContact().getPhone().get(0).getPhone());
         } catch (SQLException e) {
             e.printStackTrace();
         }
@@ -108,6 +129,14 @@ public class DataBase {
             update.setInt(10, vacancy.getExperience().getId());
             update.setInt(11, 1);
             update.setInt(12, vacancy.getId());
+
+            updateContact.setString(1, vacancy.getContact().getName());
+            updateContact.setInt(2, vacancy.getContact().getCity().getId());
+            updateContact.setInt(3, vacancy.getContact().getSubway().getId());
+            updateContact.setString(4, vacancy.getContact().getStreet());
+            updateContact.setString(5, vacancy.getContact().getBuilding());
+            updateContact.setString(6, vacancy.getContact().getPhone().get(0).getPhone());
+            updateContact.setInt(7, vacancy.getId());
         } catch (SQLException e) {
             e.printStackTrace();
         }
@@ -126,8 +155,17 @@ public class DataBase {
         int count = 0;
         try {
             conn.setAutoCommit(false);
-            delete.setInt(1, status);
-            count = delete.executeUpdate();
+            selectForDelete.setInt(1, status);
+            ResultSet resultSet = selectForDelete.executeQuery();
+            while (resultSet.next()) {
+                deleteContact.setInt(1, resultSet.getInt(1));
+                delete.setInt(1, resultSet.getInt(1));
+                deleteContact.addBatch();
+                delete.addBatch();
+                count++;
+            }
+            selectForDelete.executeBatch();
+            deleteContact.executeBatch();
             updateStatusAfterParsing.setInt(1, status);
             updateStatusAfterParsing.executeUpdate();
             conn.commit();
@@ -171,5 +209,13 @@ public class DataBase {
 
     public PreparedStatement getUpdateStatus() {
         return updateStatus;
+    }
+
+    public PreparedStatement getInsertContact() {
+        return insertContact;
+    }
+
+    public PreparedStatement getUpdateContact() {
+        return updateContact;
     }
 }
