@@ -1,8 +1,6 @@
 package ru.vacancies.database;
 
 import ru.vacancies.parser.Vacancy;
-import ru.vacancies.parser.metadata.*;
-
 import java.sql.*;
 import java.sql.ResultSet;
 
@@ -19,10 +17,9 @@ public class DataBase {
     private PreparedStatement checkUpdate;
     private PreparedStatement update;
     private PreparedStatement updateStatus;
-    private PreparedStatement updateStatusArterParsing;
+    private PreparedStatement updateStatusAfterParsing;
     private PreparedStatement delete;
     private PreparedStatement countAll;
-    private PreparedStatement countDelete;
 
     public DataBase() {
         connect();
@@ -33,11 +30,10 @@ public class DataBase {
             Class.forName("org.sqlite.JDBC");
             conn = DriverManager.getConnection("jdbc:sqlite:src/main/resources/database/VacanciesDB.db");
             Statement stmt = conn.createStatement();
-            stmt.executeUpdate("CREATE TABLE IF NOT EXISTS Vacancy (ID INTEGER PRIMARY KEY NOT NULL, Header TEXT NOT NULL, Date_Time DATETIME NOT NULL, Min_Salary INTEGER, Max_Salary INTEGER," +
-                    "Company_ID INTEGER NOT NULL REFERENCES Company (ID), WorkingType_ID INTEGER NOT NULL REFERENCES WorkingType (ID)," +
-                    "Shedule_ID INTEGER NOT NULL REFERENCES Shedule (ID), Update_Status INTEGER NOT NULL)");
-            stmt.executeUpdate("CREATE TABLE IF NOT EXISTS Vacancy_Details (Vacancy_ID INTEGER PRIMARY KEY NOT NULL REFERENCES Vacancy (ID), Description TEXT," +
-                    "Education_ID INTEGER NOT NULL REFERENCES Education (ID), Experience_ID INTEGER NOT NULL REFERENCES Experience (ID))");
+            stmt.executeUpdate("CREATE TABLE IF NOT EXISTS Vacancy (ID INTEGER PRIMARY KEY NOT NULL, Header TEXT NOT NULL, Date_Time DATETIME NOT NULL, Min_Salary INTEGER, Max_Salary INTEGER, " +
+                    "Company_ID INTEGER NOT NULL REFERENCES Company (ID), WorkingType_ID INTEGER NOT NULL REFERENCES WorkingType (ID), " +
+                    "Shedule_ID INTEGER NOT NULL REFERENCES Shedule (ID), Description TEXT, Education_ID INTEGER NOT NULL REFERENCES Education (ID), " +
+                    "Experience_ID INTEGER NOT NULL REFERENCES Experience (ID), Update_Status INTEGER NOT NULL)");
             stmt.executeUpdate("CREATE TABLE IF NOT EXISTS Contacts (ID INTEGER PRIMARY KEY NOT NULL, Title TEXT, City TEXT, Subway TEXT, Street TEXT, Building TEXT, Phone TEXT)");
             stmt.executeUpdate("CREATE TABLE IF NOT EXISTS Company (ID INTEGER PRIMARY KEY NOT NULL, Title TEXT)");
             stmt.executeUpdate("CREATE TABLE IF NOT EXISTS WorkingType (ID INTEGER PRIMARY KEY NOT NULL, Title TEXT)");
@@ -45,14 +41,13 @@ public class DataBase {
             stmt.executeUpdate("CREATE TABLE IF NOT EXISTS Education (ID INTEGER PRIMARY KEY NOT NULL, Title TEXT)");
             stmt.executeUpdate("CREATE TABLE IF NOT EXISTS Experience (ID INTEGER PRIMARY KEY NOT NULL, Title TEXT)");
 
-            insert = conn.prepareStatement("INSERT INTO Vacancy(ID, Header, Date_Time, Min_Salary, Max_Salary, Company_ID, WorkingType_ID, Shedule_ID, Update_Status) VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?)");
+            insert = conn.prepareStatement("INSERT INTO Vacancy(ID, Header, Date_Time, Min_Salary, Max_Salary, Company_ID, WorkingType_ID, Shedule_ID, Description, Education_ID, Experience_ID, Update_Status) VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
             checkUpdate = conn.prepareStatement("SELECT ID, Date_Time FROM Vacancy WHERE ID = ?");
-            update = conn.prepareStatement("UPDATE Vacancy SET Header = ?, Date_Time = ?, Min_Salary = ?, Max_Salary = ?, Company_ID = ?, WorkingType_ID = ?, Shedule_ID = ?, Update_Status = ? WHERE ID = ?;");
-            updateStatus = conn.prepareStatement("UPDATE Vacancy SET Update_Status = ? WHERE ID = ?;");
-            updateStatusArterParsing = conn.prepareStatement("UPDATE Vacancy SET Update_Status = ?");
+            update = conn.prepareStatement("UPDATE Vacancy SET Header = ?, Date_Time = ?, Min_Salary = ?, Max_Salary = ?, Company_ID = ?, WorkingType_ID = ?, Shedule_ID = ?, Description = ?, Education_ID = ?, Experience_ID = ?, Update_Status = ? WHERE ID = ?");
+            updateStatus = conn.prepareStatement("UPDATE Vacancy SET Update_Status = ? WHERE ID = ?");
+            updateStatusAfterParsing = conn.prepareStatement("UPDATE Vacancy SET Update_Status = ?");
             delete = conn.prepareStatement("DELETE FROM Vacancy WHERE Update_Status = ?");
             countAll = conn.prepareStatement("SELECT COUNT(*) FROM Vacancy");
-            //countDelete = conn.prepareStatement("SELECT ROW_COUNT() FROM Vacancy");
         } catch (Exception e) {
             System.out.println("Ошибка инициализации JDBC драйвера");
             e.printStackTrace();
@@ -69,7 +64,10 @@ public class DataBase {
             insert.setInt(6, vacancy.getCompany().getId());
             insert.setInt(7, vacancy.getWorkingType().getId());
             insert.setInt(8, vacancy.getSchedule().getId());
-            insert.setInt(9, 1);
+            insert.setString(9, vacancy.getDescription());
+            insert.setInt(10, vacancy.getEducation().getId());
+            insert.setInt(11, vacancy.getExperience().getId());
+            insert.setInt(12, 1);
         } catch (SQLException e) {
             e.printStackTrace();
         }
@@ -105,8 +103,11 @@ public class DataBase {
             update.setInt(5, vacancy.getCompany().getId());
             update.setInt(6, vacancy.getWorkingType().getId());
             update.setInt(7, vacancy.getSchedule().getId());
-            update.setInt(8, 1);
-            update.setInt(9, vacancy.getId());
+            update.setString(8, vacancy.getDescription());
+            update.setInt(9, vacancy.getEducation().getId());
+            update.setInt(10, vacancy.getExperience().getId());
+            update.setInt(11, 1);
+            update.setInt(12, vacancy.getId());
         } catch (SQLException e) {
             e.printStackTrace();
         }
@@ -127,8 +128,8 @@ public class DataBase {
             conn.setAutoCommit(false);
             delete.setInt(1, status);
             count = delete.executeUpdate();
-            updateStatusArterParsing.setInt(1, status);
-            updateStatusArterParsing.executeUpdate();
+            updateStatusAfterParsing.setInt(1, status);
+            updateStatusAfterParsing.executeUpdate();
             conn.commit();
         } catch (SQLException e) {
             e.printStackTrace();
@@ -170,9 +171,5 @@ public class DataBase {
 
     public PreparedStatement getUpdateStatus() {
         return updateStatus;
-    }
-
-    public PreparedStatement getDelete() {
-        return delete;
     }
 }
