@@ -1,5 +1,6 @@
 package ru.vacancies.database;
 
+import org.sqlite.SQLiteConfig;
 import ru.vacancies.parser.Vacancy;
 import java.sql.*;
 import java.sql.ResultSet;
@@ -13,18 +14,19 @@ public class DataBase {
     */
 
     private Connection conn;
+    private Statement stmt;
     private PreparedStatement insert;
     private PreparedStatement checkUpdate;
     private PreparedStatement update;
     private PreparedStatement updateStatus;
     private PreparedStatement updateStatusAfterParsing;
-    private PreparedStatement selectForDelete;
+    //private PreparedStatement selectForDelete;
     private PreparedStatement delete;
     private PreparedStatement countAll;
 
     private PreparedStatement insertContact;
     private PreparedStatement updateContact;
-    private PreparedStatement deleteContact;
+    //private PreparedStatement deleteContact;
 
     public DataBase() {
         connect();
@@ -33,13 +35,16 @@ public class DataBase {
     public void connect() {
         try {
             Class.forName("org.sqlite.JDBC");
-            conn = DriverManager.getConnection("jdbc:sqlite:src/main/resources/database/VacanciesDB.db");
-            Statement stmt = conn.createStatement();
+            SQLiteConfig config = new SQLiteConfig();
+            config.enforceForeignKeys(true);
+            conn = DriverManager.getConnection("jdbc:sqlite:src/main/resources/database/VacanciesDB.db", config.toProperties());
+            stmt = conn.createStatement();
+            //stmt.executeUpdate("PRAGMA foreign_keys = 0");
             stmt.executeUpdate("CREATE TABLE IF NOT EXISTS Vacancy (ID INTEGER PRIMARY KEY NOT NULL, Header TEXT NOT NULL, Date_Time DATETIME NOT NULL, Min_Salary INTEGER, Max_Salary INTEGER, " +
                     "Company_ID INTEGER NOT NULL REFERENCES Company (ID), WorkingType_ID INTEGER NOT NULL REFERENCES WorkingType (ID), " +
                     "Shedule_ID INTEGER NOT NULL REFERENCES Shedule (ID), Description TEXT, Education_ID INTEGER NOT NULL REFERENCES Education (ID), " +
                     "Experience_ID INTEGER NOT NULL REFERENCES Experience (ID), Update_Status INTEGER NOT NULL)");
-            stmt.executeUpdate("CREATE TABLE IF NOT EXISTS Contacts (ID INTEGER PRIMARY KEY NOT NULL, Title TEXT, City_ID INTEGER NOT NULL REFERENCES City (ID), Subway_ID INTEGER NOT NULL REFERENCES Subway (ID), Street TEXT, Building TEXT, Phone TEXT)");
+            stmt.executeUpdate("CREATE TABLE IF NOT EXISTS Contacts (ID INTEGER PRIMARY KEY NOT NULL REFERENCES Vacancy (ID) ON DELETE CASCADE, Title TEXT, City_ID INTEGER NOT NULL REFERENCES City (ID), Subway_ID INTEGER NOT NULL REFERENCES Subway (ID), Street TEXT, Building TEXT, Phone TEXT)");
             stmt.executeUpdate("CREATE TABLE IF NOT EXISTS Company (ID INTEGER PRIMARY KEY NOT NULL, Title TEXT)");
             stmt.executeUpdate("CREATE TABLE IF NOT EXISTS WorkingType (ID INTEGER PRIMARY KEY NOT NULL, Title TEXT)");
             stmt.executeUpdate("CREATE TABLE IF NOT EXISTS Shedule (ID INTEGER PRIMARY KEY NOT NULL, Title TEXT)");
@@ -53,13 +58,13 @@ public class DataBase {
             update = conn.prepareStatement("UPDATE Vacancy SET Header = ?, Date_Time = ?, Min_Salary = ?, Max_Salary = ?, Company_ID = ?, WorkingType_ID = ?, Shedule_ID = ?, Description = ?, Education_ID = ?, Experience_ID = ?, Update_Status = ? WHERE ID = ?");
             updateStatus = conn.prepareStatement("UPDATE Vacancy SET Update_Status = ? WHERE ID = ?");
             updateStatusAfterParsing = conn.prepareStatement("UPDATE Vacancy SET Update_Status = ?");
-            selectForDelete = conn.prepareStatement("SELECT * FROM Vacancy WHERE Update_Status = ?");
-            delete = conn.prepareStatement("DELETE FROM Vacancy WHERE ID = ?");
+            //selectForDelete = conn.prepareStatement("SELECT * FROM Vacancy WHERE Update_Status = ?");
+            delete = conn.prepareStatement("DELETE FROM Vacancy WHERE Update_Status = ?");
             countAll = conn.prepareStatement("SELECT COUNT(*) FROM Vacancy");
 
             insertContact = conn.prepareStatement("INSERT INTO Contacts(ID, Title, City_ID, Subway_ID, Street, Building, Phone) VALUES(?, ?, ?, ?, ?, ?, ?)");
             updateContact = conn.prepareStatement("UPDATE Contacts SET Title = ?, City_ID = ?, Subway_ID = ?, Street = ?, Building = ?, Phone = ? WHERE ID = ?");
-            deleteContact = conn.prepareStatement("DELETE FROM Contacts WHERE ID = ?");
+            //deleteContact = conn.prepareStatement("DELETE FROM Contacts WHERE ID = ?");
 
         } catch (Exception e) {
             System.out.println("Ошибка инициализации JDBC драйвера");
@@ -155,17 +160,18 @@ public class DataBase {
         int count = 0;
         try {
             conn.setAutoCommit(false);
-            selectForDelete.setInt(1, status);
-            ResultSet resultSet = selectForDelete.executeQuery();
-            while (resultSet.next()) {
+            delete.setInt(1, status);
+            count = delete.executeUpdate();
+            /*while (resultSet.next()) {
                 deleteContact.setInt(1, resultSet.getInt(1));
                 delete.setInt(1, resultSet.getInt(1));
                 deleteContact.addBatch();
                 delete.addBatch();
                 count++;
-            }
-            selectForDelete.executeBatch();
-            deleteContact.executeBatch();
+            }*/
+            //delete.executeBatch();
+            //deleteContact.executeBatch();
+            conn.commit();
             updateStatusAfterParsing.setInt(1, status);
             updateStatusAfterParsing.executeUpdate();
             conn.commit();
@@ -217,5 +223,9 @@ public class DataBase {
 
     public PreparedStatement getUpdateContact() {
         return updateContact;
+    }
+
+    public Statement getStmt() {
+        return stmt;
     }
 }

@@ -169,12 +169,16 @@ public class Parser {
                     System.out.println(i);
                     dataBase.getInsert().executeBatch();
                     dataBase.getInsertContact().executeBatch();
-                    dataBase.getUpdate().executeBatch();
+                    //dataBase.getStmt().execute("SET GLOBAL FOREIGN_KEY_CHECKS = 0");
                     dataBase.getUpdateContact().executeBatch();
+                    dataBase.getUpdate().executeBatch();
+                    //dataBase.getStmt().execute("SET GLOBAL FOREIGN_KEY_CHECKS = 1");
+
                     dataBase.getUpdateStatus().executeBatch();
                     dataBase.getConn().commit();
                 }
             }
+            dataBase.getConn().setAutoCommit(true);
             countDelete = dataBase.delete(0);
             countAll = dataBase.getCountAll();
         } catch (SQLException e) {
