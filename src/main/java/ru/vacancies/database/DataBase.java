@@ -28,6 +28,29 @@ public class DataBase {
     private PreparedStatement updateContact;
     //private PreparedStatement deleteContact;
 
+    private PreparedStatement insertCity;
+    private PreparedStatement updateCity;
+
+    private PreparedStatement insertSubway;
+    private PreparedStatement updateSubway;
+
+    private PreparedStatement insertCompany;
+    private PreparedStatement updateCompany;
+
+    private PreparedStatement insertEducation;
+    private PreparedStatement updateEsucation;
+
+    private PreparedStatement insertExperience;
+    private PreparedStatement updateExperience;
+
+    private PreparedStatement insertShedule;
+    private PreparedStatement updateShedule;
+
+    private PreparedStatement insertWorkingType;
+    private PreparedStatement updateWorkingType;
+
+    private String[] dataBase = {"City", "Subway", "Company", "Education", "Experience", "Shedule", "WorkingType"};
+
     public DataBase() {
         connect();
     }
@@ -39,7 +62,9 @@ public class DataBase {
             config.enforceForeignKeys(true);
             conn = DriverManager.getConnection("jdbc:sqlite:src/main/resources/database/VacanciesDB.db", config.toProperties());
             stmt = conn.createStatement();
-            //stmt.executeUpdate("PRAGMA foreign_keys = 0");
+            stmt.executeUpdate("PRAGMA foreign_keys = 1");
+            stmt.executeUpdate("PRAGMA foreign_keys = ON");
+            System.out.println(stmt.executeUpdate("PRAGMA foreign_keys"));
             stmt.executeUpdate("CREATE TABLE IF NOT EXISTS Vacancy (ID INTEGER PRIMARY KEY NOT NULL, Header TEXT NOT NULL, Date_Time DATETIME NOT NULL, Min_Salary INTEGER, Max_Salary INTEGER, " +
                     "Company_ID INTEGER NOT NULL REFERENCES Company (ID), WorkingType_ID INTEGER NOT NULL REFERENCES WorkingType (ID), " +
                     "Shedule_ID INTEGER NOT NULL REFERENCES Shedule (ID), Description TEXT, Education_ID INTEGER NOT NULL REFERENCES Education (ID), " +
@@ -65,6 +90,14 @@ public class DataBase {
             insertContact = conn.prepareStatement("INSERT INTO Contacts(ID, Title, City_ID, Subway_ID, Street, Building, Phone) VALUES(?, ?, ?, ?, ?, ?, ?)");
             updateContact = conn.prepareStatement("UPDATE Contacts SET Title = ?, City_ID = ?, Subway_ID = ?, Street = ?, Building = ?, Phone = ? WHERE ID = ?");
             //deleteContact = conn.prepareStatement("DELETE FROM Contacts WHERE ID = ?");
+
+            insertCity = conn.prepareStatement("INSERT INTO City(ID, Title) VALUES(?, ?)");
+            insertSubway = conn.prepareStatement("INSERT INTO Subway(ID, Title) VALUES(?, ?)");
+            insertCompany = conn.prepareStatement("INSERT INTO Company(ID, Title) VALUES(?, ?)");
+            insertEducation = conn.prepareStatement("INSERT INTO Education(ID, Title) VALUES(?, ?)");
+            insertExperience = conn.prepareStatement("INSERT INTO Experience(ID, Title) VALUES(?, ?)");
+            insertShedule = conn.prepareStatement("INSERT INTO Shedule(ID, Title) VALUES(?, ?)");
+            insertWorkingType = conn.prepareStatement("INSERT INTO WorkingType(ID, Title) VALUES(?, ?)");
 
         } catch (Exception e) {
             System.out.println("Ошибка инициализации JDBC драйвера");
@@ -97,6 +130,86 @@ public class DataBase {
         } catch (SQLException e) {
             e.printStackTrace();
         }
+    }
+
+    public void insertCity(Vacancy vacancy) {
+        try {
+            insertCity.setInt(1, vacancy.getContact().getCity().getId());
+            insertCity.setString(2, vacancy.getContact().getCity().getTitle());
+        } catch (SQLException e) {
+            e.printStackTrace();
+        }
+    }
+
+    public void insertSubway(Vacancy vacancy) {
+        try {
+            insertSubway.setInt(1, vacancy.getContact().getSubway().getId());
+            insertSubway.setString(2, vacancy.getContact().getSubway().getTitle());
+        } catch (SQLException e) {
+            e.printStackTrace();
+        }
+    }
+
+    public void insertCompany(Vacancy vacancy) {
+        try {
+            insertCompany.setInt(1, vacancy.getCompany().getId());
+            insertCompany.setString(2, vacancy.getCompany().getTitle());
+        } catch (SQLException e) {
+            e.printStackTrace();
+        }
+    }
+
+    public void insertEducation(Vacancy vacancy) {
+        try {
+            insertEducation.setInt(1, vacancy.getEducation().getId());
+            insertEducation.setString(2, vacancy.getEducation().getTitle());
+        } catch (SQLException e) {
+            e.printStackTrace();
+        }
+    }
+
+    public void insertExperience(Vacancy vacancy) {
+        try {
+            insertExperience.setInt(1, vacancy.getExperience().getId());
+            insertExperience.setString(2, vacancy.getExperience().getTitle());
+        } catch (SQLException e) {
+            e.printStackTrace();
+        }
+    }
+
+    public void insertShedule(Vacancy vacancy) {
+        try {
+            insertShedule.setInt(1, vacancy.getSchedule().getId());
+            insertShedule.setString(2, vacancy.getSchedule().getTitle());
+        } catch (SQLException e) {
+            e.printStackTrace();
+        }
+    }
+
+    public void insertWorkingType(Vacancy vacancy) {
+        try {
+            insertWorkingType.setInt(1, vacancy.getWorkingType().getId());
+            insertWorkingType.setString(2, vacancy.getWorkingType().getTitle());
+        } catch (SQLException e) {
+            e.printStackTrace();
+        }
+    }
+
+    public boolean checkUpdateDirectory(String database, int id) {
+        int count = 0;
+        try {
+            System.out.println("SELECT * FROM " + database + " WHERE ID = " + id);
+            System.out.println(stmt.executeUpdate("SELECT * FROM " + database + " WHERE ID = " + id));
+            ResultSet resultSet = stmt.executeQuery("SELECT * FROM " + database + " WHERE ID = " + id);
+            while (resultSet.next()) {
+                System.out.println(resultSet.getInt(1));
+                count++;
+            }
+            if (count == 0) return true;
+        } catch (SQLException e) {
+            e.printStackTrace();
+        }
+        return false;
     }
 
     // return 0 - insert new vacancy, 1 - update vacancy, 2 - skip vacancy
@@ -227,5 +340,37 @@ public class DataBase {
 
     public Statement getStmt() {
         return stmt;
+    }
+
+    public String[] getDataBase() {
+        return dataBase;
+    }
+
+    public PreparedStatement getInsertCity() {
+        return insertCity;
+    }
+
+    public PreparedStatement getInsertSubway() {
+        return insertSubway;
+    }
+
+    public PreparedStatement getInsertCompany() {
+        return insertCompany;
+    }
+
+    public PreparedStatement getInsertEducation() {
+        return insertEducation;
+    }
+
+    public PreparedStatement getInsertExperience() {
+        return insertExperience;
+    }
+
+    public PreparedStatement getInsertShedule() {
+        return insertShedule;
+    }
+
+    public PreparedStatement getInsertWorkingType() {
+        return insertWorkingType;
     }
 }

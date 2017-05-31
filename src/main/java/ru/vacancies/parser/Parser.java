@@ -10,6 +10,8 @@ import java.io.InputStreamReader;
 import java.lang.reflect.Field;
 import java.net.URL;
 import java.sql.SQLException;
+import java.util.HashMap;
+import java.util.Map;
 import java.util.concurrent.*;
 
 public class Parser {
@@ -20,6 +22,7 @@ public class Parser {
     */
 
     private CopyOnWriteArrayList<Vacancy> vacanciesList = new CopyOnWriteArrayList<>();
+    HashMap<String, Integer> map = new HashMap<>();
 
     public VacancyIDList getJSON(String url) {
         try {
@@ -155,6 +158,54 @@ public class Parser {
                     dataBase.getInsert().addBatch();
                     dataBase.getInsertContact().addBatch();
                     countAdd++;
+                    map.put("City", vacancy.getContact().getCity().getId());
+                    map.put("Subway", vacancy.getContact().getSubway().getId());
+                    map.put("Company", vacancy.getCompany().getId());
+                    map.put("Education", vacancy.getEducation().getId());
+                    map.put("Experience", vacancy.getExperience().getId());
+                    map.put("Shedule", vacancy.getSchedule().getId());
+                    map.put("WorkingType", vacancy.getWorkingType().getId());
+                    for(Map.Entry<String, Integer> entry : map.entrySet()) {
+                        String key = entry.getKey();
+                        int value = entry.getValue();
+                        if (dataBase.checkUpdateDirectory(key, value)) {
+                            if (key.equals("City")) {
+                                dataBase.insertCity(vacancy);
+                                dataBase.getInsertCity().executeUpdate();
+                                dataBase.getConn().commit();
+                            }
+                            else if (key.equals("Subway")) {
+                                dataBase.insertSubway(vacancy);
+                                dataBase.getInsertSubway().executeUpdate();
+                                dataBase.getConn().commit();
+                            }
+                            else if (key.equals("Company")) {
+                                dataBase.insertCompany(vacancy);
+                                dataBase.getInsertCompany().executeUpdate();
+                                dataBase.getConn().commit();
+                            }
+                            else if (key.equals("Education")) {
+                                dataBase.insertEducation(vacancy);
+                                dataBase.getInsertEducation().executeUpdate();
+                                dataBase.getConn().commit();
+                            }
+                            else if (key.equals("Experience")) {
+                                dataBase.insertExperience(vacancy);
+                                dataBase.getInsertExperience().executeUpdate();
+                                dataBase.getConn().commit();
+                            }
+                            else if (key.equals("Shedule")) {
+                                dataBase.insertShedule(vacancy);
+                                dataBase.getInsertShedule().executeUpdate();
+                                dataBase.getConn().commit();
+                            }
+                            else if (key.equals("WorkingType")) {
+                                dataBase.insertWorkingType(vacancy);
+                                dataBase.getInsertWorkingType().executeUpdate();
+                                dataBase.getConn().commit();
+                            }
+                        }
+                    }
                 } else if (status == 1) {
                     dataBase.update(vacancy);
                     dataBase.getUpdate().addBatch();
@@ -167,13 +218,17 @@ public class Parser {
                 i++;
                 if (i % 1000 == 0 || i == vacanciesList.size()) {
                     System.out.println(i);
+                    /*dataBase.getInsertCity().executeBatch();
+                    dataBase.getInsertSubway().executeBatch();
+                    dataBase.getInsertCompany().executeBatch();
+                    dataBase.getInsertEducation().executeBatch();
+                    dataBase.getInsertExperience().executeBatch();
+                    dataBase.getInsertShedule().executeBatch();
+                    dataBase.getInsertWorkingType().executeBatch();*/
                     dataBase.getInsert().executeBatch();
                     dataBase.getInsertContact().executeBatch();
-                    //dataBase.getStmt().execute("SET GLOBAL FOREIGN_KEY_CHECKS = 0");
-                    dataBase.getUpdateContact().executeBatch();
                     dataBase.getUpdate().executeBatch();
-                    //dataBase.getStmt().execute("SET GLOBAL FOREIGN_KEY_CHECKS = 1");
-
+                    dataBase.getUpdateContact().executeBatch();
                     dataBase.getUpdateStatus().executeBatch();
                     dataBase.getConn().commit();
                 }
