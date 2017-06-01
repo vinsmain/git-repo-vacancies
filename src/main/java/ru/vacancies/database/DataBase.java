@@ -104,13 +104,23 @@ public class DataBase {
                 count++;
             }
             if (count == 0) {
-                System.out.println("INSERT INTO " + database + " (ID, Title) VALUES(" + array[0] + ", " + array[1] + ")");
-                stmt.executeUpdate("INSERT INTO " + database + " (ID, Title) VALUES(" + Integer.valueOf(array[0]) + ", \"" + array[1] + "\")");
+                //System.out.println("INSERT INTO " + database + " (ID, Title) VALUES(" + array[0] + ", " + array[1] + ")");
+                stmt.executeUpdate("INSERT INTO " + database + " (ID, Title) VALUES(" + Integer.valueOf(array[0]) + ", '" + /*screening*/array[1] + "')");
                 conn.commit();
             }
         } catch (SQLException e) {
+            System.out.println("INSERT INTO " + database + " (ID, Title) VALUES(" + Integer.valueOf(array[0]) + ", '" + /*screening*/array[1] + "')");
             e.printStackTrace();
         }
+    }
+
+    private String screening(String value) {
+        if (value != null && value.contains("'")) {
+            System.out.println(value);
+            value = value.replace("'", "''");
+            System.out.println(value);
+        }
+        return value;
     }
 
     // return 0 - insert new vacancy, 1 - update vacancy, 2 - skip vacancy

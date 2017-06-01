@@ -89,6 +89,23 @@ public class Parser {
 
     public void checkPhoneList(Vacancy vacancy) {
         if (vacancy.getContact().getPhone().isEmpty()) vacancy.getContact().getPhone().add(new ContactPhone());
+        if (vacancy.getContact().getCity().getTitle() != null && vacancy.getContact().getCity().getTitle().contains("'")) vacancy.getContact().getCity().setTitle(vacancy.getContact().getCity().getTitle().replace("'", "''"));
+        if (vacancy.getContact().getSubway().getTitle() != null && vacancy.getContact().getSubway().getTitle().contains("'")) vacancy.getContact().getSubway().setTitle(vacancy.getContact().getSubway().getTitle().replace("'", "''"));
+        if (vacancy.getCompany().getTitle() != null && vacancy.getCompany().getTitle().contains("'")) vacancy.getCompany().setTitle(vacancy.getCompany().getTitle().replace("'", "''"));
+        if (vacancy.getEducation().getTitle() != null && vacancy.getEducation().getTitle().contains("'")) vacancy.getEducation().setTitle(vacancy.getEducation().getTitle().replace("'", "''"));
+        if (vacancy.getExperience().getTitle() != null && vacancy.getExperience().getTitle().contains("'")) vacancy.getExperience().setTitle(vacancy.getExperience().getTitle().replace("'", "''"));
+        if (vacancy.getSchedule().getTitle() != null && vacancy.getSchedule().getTitle().contains("'")) vacancy.getSchedule().setTitle(vacancy.getSchedule().getTitle().replace("'", "''"));
+        if (vacancy.getWorkingType().getTitle() != null && vacancy.getWorkingType().getTitle().contains("'")) vacancy.getWorkingType().setTitle(vacancy.getWorkingType().getTitle().replace("'", "''"));
+    }
+
+    public void checkSymbol(Vacancy vacancy) {
+        if (vacancy.getContact().getCity().getTitle() != null && vacancy.getContact().getCity().getTitle().contains("'")) vacancy.getContact().getCity().setTitle(vacancy.getContact().getCity().getTitle().replace("'", "''"));
+        if (vacancy.getContact().getSubway().getTitle() != null && vacancy.getContact().getSubway().getTitle().contains("'")) vacancy.getContact().getSubway().setTitle(vacancy.getContact().getSubway().getTitle().replace("'", "''"));
+        if (vacancy.getCompany().getTitle() != null && vacancy.getCompany().getTitle().contains("'")) vacancy.getCompany().setTitle(vacancy.getCompany().getTitle().replace("'", "''"));
+        if (vacancy.getEducation().getTitle() != null && vacancy.getEducation().getTitle().contains("'")) vacancy.getEducation().setTitle(vacancy.getEducation().getTitle().replace("'", "''"));
+        if (vacancy.getExperience().getTitle() != null && vacancy.getExperience().getTitle().contains("'")) vacancy.getExperience().setTitle(vacancy.getExperience().getTitle().replace("'", "''"));
+        if (vacancy.getSchedule().getTitle() != null && vacancy.getSchedule().getTitle().contains("'")) vacancy.getSchedule().setTitle(vacancy.getSchedule().getTitle().replace("'", "''"));
+        if (vacancy.getWorkingType().getTitle() != null && vacancy.getWorkingType().getTitle().contains("'")) vacancy.getWorkingType().setTitle(vacancy.getWorkingType().getTitle().replace("'", "''"));
     }
 
     public void parseVacancy(VacancyIDList vacancyIDList) {
@@ -99,6 +116,7 @@ public class Parser {
                 Vacancy vacancy = (getVacancy("https://api.zp.ru/v1/vacancies/" + vacancyID.getId() + "?geo_id=994").list.get(0));
                 checkVacancy(vacancy);
                 checkPhoneList(vacancy);
+                //checkSymbol(vacancy);
                 vacanciesList.add(vacancy);
                 cdl.countDown();
             });
@@ -180,7 +198,7 @@ public class Parser {
                     dataBase.getUpdateStatus().addBatch();
                 }
                 i++;
-                if (i % 1000 == 0 || i == vacanciesList.size()) {
+                if (i % 3000 == 0 || i == vacanciesList.size()) {
                     System.out.println(i);
                     dataBase.getInsert().executeBatch();
                     dataBase.getInsertContact().executeBatch();
