@@ -15,6 +15,7 @@ import java.util.Map;
 import java.util.concurrent.*;
 
 public class Parser {
+    public static final String RETURN_NULL = "return null";
     /*
     // https://api.zp.ru/v1/vacancies?offset=0&geo_id=994&limit=0 - API количества вакансий в списке
     // https://api.zp.ru/v1/vacancies?offset=0&geo_id=994&limit=50 - API списка вакансий
@@ -22,7 +23,9 @@ public class Parser {
     */
 
     private CopyOnWriteArrayList<Vacancy> vacanciesList = new CopyOnWriteArrayList<>();
-    HashMap<String, String[]> map = new HashMap<>();
+    private HashMap<String, String[]> map = new HashMap<>();
+    private CountDownLatch cdl;
+    private CountDownLatch cdlID;
 
     public VacancyIDList getJSON(String url) {
         try {
@@ -39,10 +42,12 @@ public class Parser {
         try {
             String json = readUrl(url);
             //System.out.println(json);
+            //System.out.println(new Gson().fromJson(json, VacancyList.class));
             return new Gson().fromJson(json, VacancyList.class);
         } catch (Exception e) {
             e.printStackTrace();
         }
+        System.out.println("ret null");
         return null;
     }
 
@@ -58,6 +63,8 @@ public class Parser {
             return buffer.toString();
         } catch (FileNotFoundException e){
             System.out.println("Страница не найдена: " + urlString);
+            //if (!urlString.contains("offset")) cdl.countDown();
+            //else cdlID.countDown();
             return null;
         } catch (IOException e) {
             System.out.println("Ошибка открытия страницы. Повторная попытка: " + urlString);
@@ -110,20 +117,24 @@ public class Parser {
 
     public void parseVacancy(VacancyIDList vacancyIDList) {
         ExecutorService service = Executors.newFixedThreadPool(10);
-        CountDownLatch cdl = new CountDownLatch(vacancyIDList.list.size());
+        cdl = new CountDownLatch(vacancyIDList.list.size());
         for (VacancyID vacancyID : vacancyIDList.list) {
             service.submit((Runnable) () -> {
-                Vacancy vacancy = (getVacancy("https://api.zp.ru/v1/vacancies/" + vacancyID.getId() + "?geo_id=994").list.get(0));
-                checkVacancy(vacancy);
-                checkPhoneList(vacancy);
-                //checkSymbol(vacancy);
-                vacanciesList.add(vacancy);
+                VacancyList vacancyList = getVacancy("https://api.zp.ru/v1/vacancies/" + vacancyID.getId() + "?geo_id=994");
+                if (vacancyList != null) {
+                    Vacancy vacancy = vacancyList.list.get(0);
+                    //System.out.println(vacancy.getId());
+                    checkVacancy(vacancy);
+                    checkPhoneList(vacancy);
+                    vacanciesList.add(vacancy);
+                }
                 cdl.countDown();
             });
         }
         try {
             cdl.await();
             service.shutdown();
+            System.out.println("123");
         } catch (InterruptedException e) {
             e.printStackTrace();
         }
@@ -132,7 +143,7 @@ public class Parser {
     public void parseVacancyIDList() {
         int count = getJSON("https://api.zp.ru/v1/vacancies?offset=0&geo_id=994&limit=0").metaData.getResultSet().getCount() / 100 * 100;
         System.out.println(count);
-        CountDownLatch cdl = new CountDownLatch(count / 100 + 1);
+        cdlID = new CountDownLatch(count / 100 + 1);
         ExecutorService serviceParsingID = Executors.newFixedThreadPool(10);
         ExecutorService serviceParsingVacancies = Executors.newFixedThreadPool(10);
         int offset = 0;
@@ -142,13 +153,13 @@ public class Parser {
                 VacancyIDList array = getJSON("https://api.zp.ru/v1/vacancies?offset=" + finalOffset + "&geo_id=994&limit=100");
                 serviceParsingVacancies.submit((Runnable) () -> {
                     parseVacancy(array);
-                    cdl.countDown();
+                    cdlID.countDown();
                 });
             });
             offset += 100;
         } while (offset <= count);
         try {
-            cdl.await(60000, TimeUnit.MILLISECONDS);
+            cdlID.await(60000, TimeUnit.MILLISECONDS);
             serviceParsingID.shutdown();
             serviceParsingVacancies.shutdown();
         } catch (InterruptedException e) {
