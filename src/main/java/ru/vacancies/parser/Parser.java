@@ -184,9 +184,9 @@ public class Parser {
                     map.put("Shedule", new String[]{String.valueOf(vacancy.getSchedule().getId()), vacancy.getSchedule().getTitle()});
                     map.put("WorkingType", new String[]{String.valueOf(vacancy.getWorkingType().getId()), vacancy.getWorkingType().getTitle()});
                     for(Map.Entry<String, String[]> entry : map.entrySet()) {
-                            String key = entry.getKey();
-                            String[] value = entry.getValue();
-                            dataBase.insertDirectory(key, value);
+                        String key = entry.getKey();
+                        String[] value = entry.getValue();
+                        dataBase.insertDirectory(key, value);
                     }
                 } else if (status == 1) {
                     dataBase.update(vacancy);
@@ -198,8 +198,9 @@ public class Parser {
                     dataBase.getUpdateStatus().addBatch();
                 }
                 i++;
-                if (i % 3000 == 0 || i == vacanciesList.size()) {
+                if (i % 1000 == 0 || i == vacanciesList.size()) {
                     System.out.println(i);
+                    dataBase.getStmt().executeBatch();
                     dataBase.getInsert().executeBatch();
                     dataBase.getInsertContact().executeBatch();
                     dataBase.getUpdate().executeBatch();

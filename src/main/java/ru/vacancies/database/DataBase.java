@@ -99,15 +99,8 @@ public class DataBase {
     public void insertDirectory(String database, String[] array) {
         int count = 0;
         try {
-            ResultSet resultSet = stmt.executeQuery("SELECT * FROM " + database + " WHERE ID = " + Integer.valueOf(array[0]));
-            while (resultSet.next()) {
-                count++;
-            }
-            if (count == 0) {
-                //System.out.println("INSERT INTO " + database + " (ID, Title) VALUES(" + array[0] + ", " + array[1] + ")");
-                stmt.executeUpdate("INSERT INTO " + database + " (ID, Title) VALUES(" + Integer.valueOf(array[0]) + ", '" + /*screening*/array[1] + "')");
-                conn.commit();
-            }
+            stmt.addBatch("INSERT OR IGNORE INTO " + database + " (ID, Title) VALUES(" + Integer.valueOf(array[0]) + ", '" + /*screening*/array[1] + "')");
+            stmt.addBatch("UPDATE " + database + " SET Title = '" + array[1] + "' WHERE ID = " + Integer.valueOf(array[0]));
         } catch (SQLException e) {
             System.out.println("INSERT INTO " + database + " (ID, Title) VALUES(" + Integer.valueOf(array[0]) + ", '" + /*screening*/array[1] + "')");
             e.printStackTrace();
