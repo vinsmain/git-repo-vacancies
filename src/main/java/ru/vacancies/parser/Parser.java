@@ -13,6 +13,7 @@ import java.sql.SQLException;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.concurrent.*;
+import java.util.concurrent.atomic.AtomicInteger;
 
 public class Parser {
     public static final String RETURN_NULL = "return null";
@@ -134,13 +135,14 @@ public class Parser {
         try {
             cdl.await();
             service.shutdown();
-            System.out.println("123");
         } catch (InterruptedException e) {
             e.printStackTrace();
         }
     }
 
     public void parseVacancyIDList() {
+        AtomicInteger j = new AtomicInteger(0);
+        System.out.println(getJSON("https://api.zp.ru/v1/vacancies?offset=0&geo_id=994&limit=0").metaData.getResultSet().getCount());
         int count = getJSON("https://api.zp.ru/v1/vacancies?offset=0&geo_id=994&limit=0").metaData.getResultSet().getCount() / 100 * 100;
         System.out.println(count);
         cdlID = new CountDownLatch(count / 100 + 1);
@@ -153,11 +155,13 @@ public class Parser {
                 VacancyIDList array = getJSON("https://api.zp.ru/v1/vacancies?offset=" + finalOffset + "&geo_id=994&limit=100");
                 serviceParsingVacancies.submit((Runnable) () -> {
                     parseVacancy(array);
+                j.set(j.get() + 1);
                     cdlID.countDown();
                 });
             });
             offset += 100;
         } while (offset <= count);
+
         try {
             cdlID.await(60000, TimeUnit.MILLISECONDS);
             serviceParsingID.shutdown();
@@ -165,8 +169,9 @@ public class Parser {
         } catch (InterruptedException e) {
             e.printStackTrace();
         }
+        System.out.println(j.get());
         System.out.println("Парсинг завершен. Всего вакансий: " + vacanciesList.size());
-        updateDataBase(vacanciesList);
+        //updateDataBase(vacanciesList);
     }
 
     public void updateDataBase(CopyOnWriteArrayList<Vacancy> vacanciesList) {
