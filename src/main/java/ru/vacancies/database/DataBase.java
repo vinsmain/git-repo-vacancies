@@ -97,14 +97,11 @@ public class DataBase {
     }
 
     public void insertDirectory(String database, String[] array) {
-        int count = 0;
         try {
             stmt.addBatch("INSERT OR IGNORE INTO " + database + " (ID, Title) VALUES(" + Integer.valueOf(array[0]) + ", '" + array[1] + "')");
             stmt.addBatch("UPDATE " + database + " SET Title = '" + array[1] + "' WHERE ID = " + Integer.valueOf(array[0]));
-            //stmt.addBatch("INSERT INTO " + database + " (ID, Title) VALUES (" + Integer.valueOf(array[0]) + ", '" + array[1] + "') ON DUPLICATE KEY UPDATE Title = " + array[1]);
-            //stmt.addBatch("INSERT OR REPLACE INTO " + database + " (ID, Title) VALUES (" + Integer.valueOf(array[0]) + ", '" + array[1] + "')");
         } catch (SQLException e) {
-            System.out.println("INSERT INTO " + database + " (ID, Title) VALUES(" + Integer.valueOf(array[0]) + ", '" + /*screening*/array[1] + "')");
+            System.out.println("INSERT INTO " + database + " (ID, Title) VALUES(" + Integer.valueOf(array[0]) + ", '" + array[1] + "')");
             e.printStackTrace();
         }
     }

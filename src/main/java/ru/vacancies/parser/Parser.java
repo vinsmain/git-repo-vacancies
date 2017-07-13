@@ -14,10 +14,11 @@ import java.sql.SQLException;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.Vector;
 import java.util.concurrent.*;
 
 public class Parser {
-    public static final String RETURN_NULL = "return null";
+
     /*
     // API количества вакансий в списке
     */
@@ -33,9 +34,28 @@ public class Parser {
     */
     private final String VAC_API = "https://api.zp.ru/v1/vacancies/79125333?geo_id=994";
 
+    /*
+    // ID города, для которого ищем вакансии (GEO_ID = 994 для Екатеринбурга)
+    */
+    private final int GEO_ID = 994;
 
-    private CopyOnWriteArrayList<ID> resultIDList = new CopyOnWriteArrayList<>();
-    private CopyOnWriteArrayList<Vacancy> vacanciesList = new CopyOnWriteArrayList<>();
+    /*
+    // Число потоков
+    */
+    private final int THREDS_COUNT = 30;
+
+    /*
+    // Ограничение на получаемое число вакансий одним запросом (max = 100)
+    */
+    private final int LIMITS_COUNT = 100;
+
+    /*
+    // Максимальное время ожидания выполнения операции (MILLISECONDS)
+    */
+    private final int TIMEOUT = 60000;
+
+    private Vector<ID> resultIDList = new Vector<>();
+    private Vector<Vacancy> vacanciesList = new Vector<>();
     private HashMap<String, String[]> map = new HashMap<>();
     private int count;
     private int offset = 0;
@@ -50,7 +70,51 @@ public class Parser {
         getCount();
         parseIDList();
         parseVacancy(resultIDList);
+
+        HashMap<Integer, Integer> hm = new HashMap<Integer, Integer>();
+        Integer am;
+        System.out.println(resultIDList.size());
+        for (ID i : resultIDList) {
+
+            am = hm.get(i);
+            if (am == null) hm.put(i.getId(), 1);
+            else {
+                hm.put(i.getId(), am + 1);
+                System.out.println(i.getId());
+            }
+        }
+        for(Map.Entry<Integer, Integer> entry : hm.entrySet()) {
+            Integer key = entry.getKey();
+            Integer value = entry.getValue();
+
+            for (ID i : resultIDList) {
+
+                am = hm.get(i);
+                if (am == key) System.out.println(i.getId());
+            }
+
+            if (value != 1) System.out.println("VacList = " + hm.size() + " " + key + " " + value);
+        }
+        System.out.println("IDList = " + hm.size());
+        System.out.println(resultIDList.size());
+
         updateDataBase(vacanciesList);
+
+        HashMap<Integer, Integer> hm1 = new HashMap<Integer, Integer>();
+        Integer am1;
+        for (Vacancy i : vacanciesList) {
+
+            am1 = hm1.get(i);
+            hm1.put(i.getId(), am1 == null ? 1 : am1 + 1);
+        }
+        for(Map.Entry<Integer, Integer> entry : hm1.entrySet()) {
+            Integer key = entry.getKey();
+            Integer value = entry.getValue();
+            if (value != 1) System.out.println("VacList = " + hm1.size() + " " + key + " " + value);
+        }
+        System.out.println("VacList = " + hm1.size());
+
+
     }
 
     /*
@@ -63,23 +127,23 @@ public class Parser {
     /*
     // Получаем список ID всех вакансий
     */
-    public void parseIDList() {
+    private void parseIDList() {
         System.out.println(count);
-        cdlID = new CountDownLatch(count / 100 + 1);
-        ExecutorService serviceParsingIDList = Executors.newFixedThreadPool(20);
+        cdlID = new CountDownLatch(count / LIMITS_COUNT + 1);
+        ExecutorService serviceParsingIDList = Executors.newFixedThreadPool(THREDS_COUNT);
 
         do {
             final int finalOffset = offset;
             serviceParsingIDList.submit((Runnable) () -> {
-                IDList tempIDList = getIDList("https://api.zp.ru/v1/vacancies?offset=" + finalOffset + "&geo_id=994&limit=100");
+                IDList tempIDList = getIDList("https://api.zp.ru/v1/vacancies?offset=" + finalOffset + "&geo_id=" + GEO_ID + "&limit=" + LIMITS_COUNT);
                 resultIDList.addAll(tempIDList.list);
                 cdlID.countDown();
             });
-            offset += 100;
-        } while (offset <= count / 100 * 100);
+            offset += LIMITS_COUNT;
+        } while (offset <= count / LIMITS_COUNT * LIMITS_COUNT);
 
         try {
-            cdlID.await(30000, TimeUnit.MILLISECONDS);
+            cdlID.await(TIMEOUT, TimeUnit.MILLISECONDS);
             serviceParsingIDList.shutdown();
         } catch (InterruptedException e) {
             e.printStackTrace();
@@ -94,16 +158,16 @@ public class Parser {
     /*
     // Получаем список всех вакансий
     */
-    public void parseVacancy(CopyOnWriteArrayList<ID> resultIDList) {
-        ExecutorService service = Executors.newFixedThreadPool(50);
+    private void parseVacancy(Vector<ID> resultIDList) {
+        ExecutorService service = Executors.newFixedThreadPool(THREDS_COUNT);
         cdl = new CountDownLatch(resultIDList.size());
         for (ID id : resultIDList) {
             service.submit((Runnable) () -> {
-                VacancyList vacancyList = getVacancyList("https://api.zp.ru/v1/vacancies/" + id.getId() + "?geo_id=994");
+                VacancyList vacancyList = getVacancyList("https://api.zp.ru/v1/vacancies/" + id.getId() + "?geo_id=" + GEO_ID);
                 if (vacancyList != null) {
                     Vacancy vacancy = vacancyList.list.get(0);
-
                     checkVacancy(vacancy);
+                    checkSymbol(vacancy);
                     checkPhoneList(vacancy);
                     vacanciesList.add(vacancy);
                 } else System.out.println(123);
@@ -111,7 +175,7 @@ public class Parser {
             });
         }
         try {
-            cdl.await(60000, TimeUnit.MILLISECONDS);
+            cdl.await(TIMEOUT, TimeUnit.MILLISECONDS);
             service.shutdown();
             System.out.println("END " + vacanciesList.size());
         } catch (InterruptedException e) {
@@ -122,7 +186,7 @@ public class Parser {
     /*
     // Получаем список ID для указанного числа вакансий
     */
-    public IDList getIDList(String url) {
+    private IDList getIDList(String url) {
         try {
             String json = readUrl(url);
             return new Gson().fromJson(json, IDList.class);
@@ -135,7 +199,7 @@ public class Parser {
     /*
     // Получаем список вакансий, содержащий одну вакансию по указанному ID
     */
-    public VacancyList getVacancyList(String url) {
+    private VacancyList getVacancyList(String url) {
         try {
             String json = readUrl(url);
             return new Gson().fromJson(json, VacancyList.class);
@@ -173,7 +237,7 @@ public class Parser {
     // Проверка на наличие отсутствующих полей
     // Если такие поля обнаруживаются, то они создаются с использованием конструктора по умолчанию
     */
-    public void checkVacancy(Object obj) {
+    private void checkVacancy(Object obj) {
         Class c = obj.getClass();
         Field[] publicFields = c.getDeclaredFields();
         for (Field field : publicFields) {
@@ -193,32 +257,39 @@ public class Parser {
         }
     }
 
-    public void checkPhoneList(Vacancy vacancy) {
+    /*
+    // Проверка списка телефонных номеров
+    // Если список пустой - создаем телефонный номер по умолчанию
+    */
+    private void checkPhoneList(Vacancy vacancy) {
         if (vacancy.getContact().getPhone().isEmpty()) vacancy.getContact().getPhone().add(new ContactPhone());
-        if (vacancy.getContact().getCity().getTitle() != null && vacancy.getContact().getCity().getTitle().contains("'")) vacancy.getContact().getCity().setTitle(vacancy.getContact().getCity().getTitle().replace("'", "''"));
-        if (vacancy.getContact().getSubway().getTitle() != null && vacancy.getContact().getSubway().getTitle().contains("'")) vacancy.getContact().getSubway().setTitle(vacancy.getContact().getSubway().getTitle().replace("'", "''"));
-        if (vacancy.getCompany().getTitle() != null && vacancy.getCompany().getTitle().contains("'")) vacancy.getCompany().setTitle(vacancy.getCompany().getTitle().replace("'", "''"));
-        if (vacancy.getEducation().getTitle() != null && vacancy.getEducation().getTitle().contains("'")) vacancy.getEducation().setTitle(vacancy.getEducation().getTitle().replace("'", "''"));
-        if (vacancy.getExperience().getTitle() != null && vacancy.getExperience().getTitle().contains("'")) vacancy.getExperience().setTitle(vacancy.getExperience().getTitle().replace("'", "''"));
-        if (vacancy.getSchedule().getTitle() != null && vacancy.getSchedule().getTitle().contains("'")) vacancy.getSchedule().setTitle(vacancy.getSchedule().getTitle().replace("'", "''"));
-        if (vacancy.getWorkingType().getTitle() != null && vacancy.getWorkingType().getTitle().contains("'")) vacancy.getWorkingType().setTitle(vacancy.getWorkingType().getTitle().replace("'", "''"));
     }
 
-    public void checkSymbol(Vacancy vacancy) {
-        if (vacancy.getContact().getCity().getTitle() != null && vacancy.getContact().getCity().getTitle().contains("'")) vacancy.getContact().getCity().setTitle(vacancy.getContact().getCity().getTitle().replace("'", "''"));
-        if (vacancy.getContact().getSubway().getTitle() != null && vacancy.getContact().getSubway().getTitle().contains("'")) vacancy.getContact().getSubway().setTitle(vacancy.getContact().getSubway().getTitle().replace("'", "''"));
-        if (vacancy.getCompany().getTitle() != null && vacancy.getCompany().getTitle().contains("'")) vacancy.getCompany().setTitle(vacancy.getCompany().getTitle().replace("'", "''"));
-        if (vacancy.getEducation().getTitle() != null && vacancy.getEducation().getTitle().contains("'")) vacancy.getEducation().setTitle(vacancy.getEducation().getTitle().replace("'", "''"));
-        if (vacancy.getExperience().getTitle() != null && vacancy.getExperience().getTitle().contains("'")) vacancy.getExperience().setTitle(vacancy.getExperience().getTitle().replace("'", "''"));
-        if (vacancy.getSchedule().getTitle() != null && vacancy.getSchedule().getTitle().contains("'")) vacancy.getSchedule().setTitle(vacancy.getSchedule().getTitle().replace("'", "''"));
-        if (vacancy.getWorkingType().getTitle() != null && vacancy.getWorkingType().getTitle().contains("'")) vacancy.getWorkingType().setTitle(vacancy.getWorkingType().getTitle().replace("'", "''"));
+    /*
+    // Проверка строковых полей на наличие одинарных кавычек(')
+    // Если таковые присутствуют, то экранируем их еще одной одинарной кавычкой
+    // Иначе наблюдаются проблемы с записью в БД
+    */
+    private void checkSymbol(Vacancy vacancy) {
+        if (vacancy.getContact().getCity().getTitle() != null && vacancy.getContact().getCity().getTitle().contains("'"))
+            vacancy.getContact().getCity().setTitle(vacancy.getContact().getCity().getTitle().replace("'", "''"));
+        if (vacancy.getContact().getCity().getTitle() != null && vacancy.getContact().getCity().getTitle().contains("'"))
+            vacancy.getContact().getCity().setTitle(vacancy.getContact().getCity().getTitle().replace("'", "''"));
+        if (vacancy.getContact().getSubway().getTitle() != null && vacancy.getContact().getSubway().getTitle().contains("'"))
+            vacancy.getContact().getSubway().setTitle(vacancy.getContact().getSubway().getTitle().replace("'", "''"));
+        if (vacancy.getCompany().getTitle() != null && vacancy.getCompany().getTitle().contains("'"))
+            vacancy.getCompany().setTitle(vacancy.getCompany().getTitle().replace("'", "''"));
+        if (vacancy.getEducation().getTitle() != null && vacancy.getEducation().getTitle().contains("'"))
+            vacancy.getEducation().setTitle(vacancy.getEducation().getTitle().replace("'", "''"));
+        if (vacancy.getExperience().getTitle() != null && vacancy.getExperience().getTitle().contains("'"))
+            vacancy.getExperience().setTitle(vacancy.getExperience().getTitle().replace("'", "''"));
+        if (vacancy.getSchedule().getTitle() != null && vacancy.getSchedule().getTitle().contains("'"))
+            vacancy.getSchedule().setTitle(vacancy.getSchedule().getTitle().replace("'", "''"));
+        if (vacancy.getWorkingType().getTitle() != null && vacancy.getWorkingType().getTitle().contains("'"))
+            vacancy.getWorkingType().setTitle(vacancy.getWorkingType().getTitle().replace("'", "''"));
     }
 
-
-
-
-
-    public void updateDataBase(CopyOnWriteArrayList<Vacancy> vacanciesList) {
+    private void updateDataBase(Vector<Vacancy> vacanciesList) {
         dataBase = new DataBase();
         int countAll = 0;
         int countAdd = 0;
@@ -286,7 +357,7 @@ public class Parser {
         System.out.println("Без изменений: " + countSkip);
     }
 
-    public void printVacancyListInfo(CopyOnWriteArrayList<Vacancy> vacanciesList) {
+    public void printVacancyListInfo(Vector<Vacancy> vacanciesList) {
         int i = 1;
         for (Vacancy vacancy : vacanciesList) {
             System.out.println(i + " " + vacancy.getId() + " " + vacancy.getHeader() + " " + vacancy.getEducation().getId() + vacancy.getEducation().getTitle() + " " + vacancy.getExperience().getId() + vacancy.getExperience().getTitle() +
