@@ -7,6 +7,6 @@ public class StartClass {
     public static void main(String[] args) {
 
         Parser parser = new Parser();
-        parser.parseVacancyIDList();
+        parser.startParsing();
     }
 }

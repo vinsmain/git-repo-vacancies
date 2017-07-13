@@ -5,11 +5,11 @@ import ru.vacancies.parser.metadata.MetaData;
 
 import java.util.ArrayList;
 
-public class VacancyIDList {
+public class IDList {
 
     @SerializedName("metadata")
     public MetaData metaData;
 
     @SerializedName("vacancies")
-    public ArrayList<VacancyID> list;
+    public ArrayList<ID> list;
 }

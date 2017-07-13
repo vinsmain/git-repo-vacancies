@@ -1,6 +1,7 @@
 package ru.vacancies.parser;
 
 import com.google.gson.Gson;
+import javafx.collections.ObservableList;
 import ru.vacancies.database.DataBase;
 import ru.vacancies.parser.model.ContactPhone;
 import java.io.BufferedReader;
@@ -10,48 +11,143 @@ import java.io.InputStreamReader;
 import java.lang.reflect.Field;
 import java.net.URL;
 import java.sql.SQLException;
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.concurrent.*;
-import java.util.concurrent.atomic.AtomicInteger;
 
 public class Parser {
     public static final String RETURN_NULL = "return null";
     /*
-    // https://api.zp.ru/v1/vacancies?offset=0&geo_id=994&limit=0 - API количества вакансий в списке
-    // https://api.zp.ru/v1/vacancies?offset=0&geo_id=994&limit=50 - API списка вакансий
-    // https://api.zp.ru/v1/vacancies/79125333?geo_id=994 - API одной вакансии
+    // API количества вакансий в списке
     */
+    private final String COUNT_API = "https://api.zp.ru/v1/vacancies?offset=0&geo_id=994&limit=0";
 
+    /*
+    // API списка вакансий
+    */
+    private final String VAC_LIST_API = "https://api.zp.ru/v1/vacancies?offset=0&geo_id=994&limit=50";
+
+    /*
+    // API одной вакансии
+    */
+    private final String VAC_API = "https://api.zp.ru/v1/vacancies/79125333?geo_id=994";
+
+
+    private CopyOnWriteArrayList<ID> resultIDList = new CopyOnWriteArrayList<>();
     private CopyOnWriteArrayList<Vacancy> vacanciesList = new CopyOnWriteArrayList<>();
     private HashMap<String, String[]> map = new HashMap<>();
+    private int count;
+    private int offset = 0;
     private CountDownLatch cdl;
     private CountDownLatch cdlID;
+    private DataBase dataBase;
 
-    public VacancyIDList getJSON(String url) {
+    /*
+    // Запуск парсинга
+    */
+    public void startParsing() {
+        getCount();
+        parseIDList();
+        parseVacancy(resultIDList);
+        updateDataBase(vacanciesList);
+    }
+
+    /*
+    // Получаем общее количество вакансий на данный момент
+    */
+    private void getCount() {
+        count = getIDList(COUNT_API).metaData.getResultSet().getCount();
+    }
+
+    /*
+    // Получаем список ID всех вакансий
+    */
+    public void parseIDList() {
+        System.out.println(count);
+        cdlID = new CountDownLatch(count / 100 + 1);
+        ExecutorService serviceParsingIDList = Executors.newFixedThreadPool(20);
+
+        do {
+            final int finalOffset = offset;
+            serviceParsingIDList.submit((Runnable) () -> {
+                IDList tempIDList = getIDList("https://api.zp.ru/v1/vacancies?offset=" + finalOffset + "&geo_id=994&limit=100");
+                resultIDList.addAll(tempIDList.list);
+                cdlID.countDown();
+            });
+            offset += 100;
+        } while (offset <= count / 100 * 100);
+
+        try {
+            cdlID.await(30000, TimeUnit.MILLISECONDS);
+            serviceParsingIDList.shutdown();
+        } catch (InterruptedException e) {
+            e.printStackTrace();
+        }
+
+        System.out.println("Парсинг завершен. Всего вакансий: " + resultIDList.size());
+        /*for (ID id: resultIDList) {
+            System.out.println(id.getId());
+        }*/
+    }
+
+    /*
+    // Получаем список всех вакансий
+    */
+    public void parseVacancy(CopyOnWriteArrayList<ID> resultIDList) {
+        ExecutorService service = Executors.newFixedThreadPool(50);
+        cdl = new CountDownLatch(resultIDList.size());
+        for (ID id : resultIDList) {
+            service.submit((Runnable) () -> {
+                VacancyList vacancyList = getVacancyList("https://api.zp.ru/v1/vacancies/" + id.getId() + "?geo_id=994");
+                if (vacancyList != null) {
+                    Vacancy vacancy = vacancyList.list.get(0);
+
+                    checkVacancy(vacancy);
+                    checkPhoneList(vacancy);
+                    vacanciesList.add(vacancy);
+                } else System.out.println(123);
+                cdl.countDown();
+            });
+        }
+        try {
+            cdl.await(60000, TimeUnit.MILLISECONDS);
+            service.shutdown();
+            System.out.println("END " + vacanciesList.size());
+        } catch (InterruptedException e) {
+            e.printStackTrace();
+        }
+    }
+
+    /*
+    // Получаем список ID для указанного числа вакансий
+    */
+    public IDList getIDList(String url) {
         try {
             String json = readUrl(url);
-            //System.out.println(json);
-            return new Gson().fromJson(json, VacancyIDList.class);
+            return new Gson().fromJson(json, IDList.class);
         } catch (Exception e) {
             e.printStackTrace();
         }
         return null;
     }
 
-    public VacancyList getVacancy(String url) {
+    /*
+    // Получаем список вакансий, содержащий одну вакансию по указанному ID
+    */
+    public VacancyList getVacancyList(String url) {
         try {
             String json = readUrl(url);
-            //System.out.println(json);
-            //System.out.println(new Gson().fromJson(json, VacancyList.class));
             return new Gson().fromJson(json, VacancyList.class);
         } catch (Exception e) {
             e.printStackTrace();
         }
-        System.out.println("ret null");
         return null;
     }
 
+    /*
+    // Получаем JSON по ссылке
+    */
     private String readUrl(String urlString) throws Exception {
         BufferedReader reader = null;
         try {
@@ -63,9 +159,7 @@ public class Parser {
             while ((read = reader.read(chars)) != -1) buffer.append(chars, 0, read);
             return buffer.toString();
         } catch (FileNotFoundException e){
-            System.out.println("Страница не найдена: " + urlString);
-            //if (!urlString.contains("offset")) cdl.countDown();
-            //else cdlID.countDown();
+            System.out.println("Страница не найдена: " + urlString + " : 404");
             return null;
         } catch (IOException e) {
             System.out.println("Ошибка открытия страницы. Повторная попытка: " + urlString);
@@ -75,6 +169,10 @@ public class Parser {
         }
     }
 
+    /*
+    // Проверка на наличие отсутствующих полей
+    // Если такие поля обнаруживаются, то они создаются с использованием конструктора по умолчанию
+    */
     public void checkVacancy(Object obj) {
         Class c = obj.getClass();
         Field[] publicFields = c.getDeclaredFields();
@@ -116,70 +214,17 @@ public class Parser {
         if (vacancy.getWorkingType().getTitle() != null && vacancy.getWorkingType().getTitle().contains("'")) vacancy.getWorkingType().setTitle(vacancy.getWorkingType().getTitle().replace("'", "''"));
     }
 
-    public void parseVacancy(VacancyIDList vacancyIDList) {
-        ExecutorService service = Executors.newFixedThreadPool(10);
-        cdl = new CountDownLatch(vacancyIDList.list.size());
-        for (VacancyID vacancyID : vacancyIDList.list) {
-            service.submit((Runnable) () -> {
-                VacancyList vacancyList = getVacancy("https://api.zp.ru/v1/vacancies/" + vacancyID.getId() + "?geo_id=994");
-                if (vacancyList != null) {
-                    Vacancy vacancy = vacancyList.list.get(0);
-                    //System.out.println(vacancy.getId());
-                    checkVacancy(vacancy);
-                    checkPhoneList(vacancy);
-                    vacanciesList.add(vacancy);
-                }
-                cdl.countDown();
-            });
-        }
-        try {
-            cdl.await();
-            service.shutdown();
-        } catch (InterruptedException e) {
-            e.printStackTrace();
-        }
-    }
 
-    public void parseVacancyIDList() {
-        AtomicInteger j = new AtomicInteger(0);
-        System.out.println(getJSON("https://api.zp.ru/v1/vacancies?offset=0&geo_id=994&limit=0").metaData.getResultSet().getCount());
-        int count = getJSON("https://api.zp.ru/v1/vacancies?offset=0&geo_id=994&limit=0").metaData.getResultSet().getCount() / 100 * 100;
-        System.out.println(count);
-        cdlID = new CountDownLatch(count / 100 + 1);
-        ExecutorService serviceParsingID = Executors.newFixedThreadPool(10);
-        ExecutorService serviceParsingVacancies = Executors.newFixedThreadPool(10);
-        int offset = 0;
-        do {
-            final int finalOffset = offset;
-            serviceParsingID.submit((Runnable) () -> {
-                VacancyIDList array = getJSON("https://api.zp.ru/v1/vacancies?offset=" + finalOffset + "&geo_id=994&limit=100");
-                serviceParsingVacancies.submit((Runnable) () -> {
-                    parseVacancy(array);
-                j.set(j.get() + 1);
-                    cdlID.countDown();
-                });
-            });
-            offset += 100;
-        } while (offset <= count);
 
-        try {
-            cdlID.await(60000, TimeUnit.MILLISECONDS);
-            serviceParsingID.shutdown();
-            serviceParsingVacancies.shutdown();
-        } catch (InterruptedException e) {
-            e.printStackTrace();
-        }
-        System.out.println(j.get());
-        System.out.println("Парсинг завершен. Всего вакансий: " + vacanciesList.size());
-        //updateDataBase(vacanciesList);
-    }
+
 
     public void updateDataBase(CopyOnWriteArrayList<Vacancy> vacanciesList) {
-        DataBase dataBase = new DataBase();
+        dataBase = new DataBase();
         int countAll = 0;
         int countAdd = 0;
         int countUpdate = 0;
         int countDelete = 0;
+        int countSkip = 0;
         Vacancy vac = null;
         try {
             int i = 0;
@@ -191,7 +236,6 @@ public class Parser {
                     dataBase.insert(vacancy);
                     dataBase.getInsert().addBatch();
                     dataBase.getInsertContact().addBatch();
-                    countAdd++;
                     map.put("City", new String[]{String.valueOf(vacancy.getContact().getCity().getId()), vacancy.getContact().getCity().getTitle()});
                     map.put("Subway", new String[]{String.valueOf(vacancy.getContact().getSubway().getId()), vacancy.getContact().getSubway().getTitle()});
                     map.put("Company", new String[]{String.valueOf(vacancy.getCompany().getId()), vacancy.getCompany().getTitle()});
@@ -204,6 +248,7 @@ public class Parser {
                         String[] value = entry.getValue();
                         dataBase.insertDirectory(key, value);
                     }
+                    countAdd++;
                 } else if (status == 1) {
                     dataBase.update(vacancy);
                     dataBase.getUpdate().addBatch();
@@ -212,6 +257,7 @@ public class Parser {
                 } else if (status == 2) {
                     dataBase.updateStatus(vacancy, 1);
                     dataBase.getUpdateStatus().addBatch();
+                    countSkip++;
                 }
                 i++;
                 if (i % 1000 == 0 || i == vacanciesList.size()) {
@@ -237,6 +283,7 @@ public class Parser {
         System.out.println("Добавлено: " + countAdd);
         System.out.println("Обновлено: " + countUpdate);
         System.out.println("Удалено: " + countDelete);
+        System.out.println("Без изменений: " + countSkip);
     }
 
     public void printVacancyListInfo(CopyOnWriteArrayList<Vacancy> vacanciesList) {

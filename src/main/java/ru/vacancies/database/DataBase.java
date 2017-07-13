@@ -130,6 +130,7 @@ public class DataBase {
             if (dateTime != null && !vacancy.getDateTime().equals(dateTime)) {
                 return 1;
             } else if (dateTime != null && vacancy.getDateTime().equals(dateTime)) {
+                //System.out.println(vacancy.getId() + " " + dateTime + " " + vacancy.getDescription());
                 return 2;
             } else if (dateTime == null) return 0;
         } catch (SQLException e) {
