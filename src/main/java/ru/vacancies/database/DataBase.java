@@ -2,16 +2,19 @@ package ru.vacancies.database;
 
 import org.sqlite.SQLiteConfig;
 import org.sqlite.SQLiteOpenMode;
+import ru.vacancies.parser.ID;
 import ru.vacancies.parser.Vacancy;
 import java.sql.*;
 import java.sql.ResultSet;
+import java.util.*;
+import java.util.Date;
 
 public class DataBase {
 
     /*
     // Update_Status
-    // 0 - no update
-    // 1 - update
+    // 0 - НЕ обновляем вакансию
+    // 1 - обновляем вакансию
     */
 
     private Connection conn;
@@ -25,11 +28,21 @@ public class DataBase {
     private PreparedStatement countAll;
     private PreparedStatement insertContact;
     private PreparedStatement updateContact;
+    private int count = 0;
+    private int countAdd = 0;
+    private int countUpdate = 0;
+    private int countDelete = 0;
+    private int countSkip = 0;
 
     public DataBase() {
         connect();
     }
 
+    /*
+    // Подключение к БД
+    // Создание необходимых таблиц, если таковые отсутствуют
+    // Инициализация основных запросов
+    */
     public void connect() {
         try {
             Class.forName("org.sqlite.JDBC");
@@ -62,14 +75,79 @@ public class DataBase {
 
             insertContact = conn.prepareStatement("INSERT INTO Contacts(ID, Title, City_ID, Subway_ID, Street, Building, Phone) VALUES(?, ?, ?, ?, ?, ?, ?)");
             updateContact = conn.prepareStatement("UPDATE Contacts SET Title = ?, City_ID = ?, Subway_ID = ?, Street = ?, Building = ?, Phone = ? WHERE ID = ?");
-
         } catch (Exception e) {
             System.out.println("Ошибка инициализации JDBC драйвера");
             e.printStackTrace();
         }
     }
 
-    public void insert(Vacancy vacancy) {
+    /*
+    // Метод, запускающий обновление данных в базе
+    */
+    public void updateDataBase(Vector<Vacancy> vacanciesList) {
+        System.out.println(new java.util.Date() + " Начинаем обновление базы данных");
+        Vacancy vac = null;
+        try {
+            conn.setAutoCommit(false);
+            countSkip = updateStatus.executeBatch().length;
+            conn.commit();
+            int i = 0;
+            for (Vacancy vacancy : vacanciesList) {
+                vac = vacancy;
+                int status = vacancy.getStatus();
+                if (status == 0) {
+                    insertVacancy(vacancy);
+                    insertContact(vacancy);
+                    insert.addBatch();
+                    insertContact.addBatch();
+                    insertSecondaryFieldsInDB(vacancy);
+                    countAdd++;
+                } else if (status == 1) {
+                    updateVacancy(vacancy);
+                    updateContact(vacancy);
+                    update.addBatch();
+                    updateContact.addBatch();
+                    countUpdate++;
+                }
+                i++;
+                if (i % 1000 == 0 || i == vacanciesList.size()) {
+                    System.out.println(new java.util.Date() + " Обработано записей: " + i);
+                    try {
+                        stmt.executeBatch();
+                        insert.executeBatch();
+                        insertContact.executeBatch();
+                        update.executeBatch();
+                        updateContact.executeBatch();
+                        updateStatus.executeBatch();
+                    } catch (BatchUpdateException e) {
+                        System.out.print("Ошибка записи в БД: ");
+                        System.out.println(vac != null ? vac.getId() : 0);
+                        e.printStackTrace();
+                    }
+                    conn.commit();
+                }
+            }
+            countDelete = delete(0);
+            updateStatusAfterParsing(0);
+            count = getCountAll();
+        } catch (SQLException e) {
+            System.out.println(vac != null ? vac.getId() : 0); //TODO Доработать сообщение об ошибке. Сейчас выводится id не той вакансии, из-за которой произошла ошибка.
+            e.printStackTrace();
+        } finally {
+            try {
+                conn.commit();
+                disconnect();
+                System.out.println(new java.util.Date() + " База обновлена");
+            } catch (SQLException e) {
+                e.printStackTrace();
+            }
+        }
+    }
+
+    /*
+    // Добавление новых данных в таблицу "Vacancy"
+    */
+    private void insertVacancy(Vacancy vacancy) {
         try {
             insert.setInt(1, vacancy.getId());
             insert.setString(2, vacancy.getHeader());
@@ -83,7 +161,16 @@ public class DataBase {
             insert.setInt(10, vacancy.getEducation().getId());
             insert.setInt(11, vacancy.getExperience().getId());
             insert.setInt(12, 1);
+        } catch (SQLException e) {
+            e.printStackTrace();
+        }
+    }
 
+    /*
+    // Добавление новых данных в таблицу "Contacts"
+    */
+    private void insertContact(Vacancy vacancy) {
+        try {
             insertContact.setInt(1, vacancy.getId());
             insertContact.setString(2, vacancy.getContact().getName());
             insertContact.setInt(3, vacancy.getContact().getCity().getId());
@@ -96,30 +183,37 @@ public class DataBase {
         }
     }
 
-    public void insertDirectory(String database, String[] array) {
-        int count = 0;
-        try {
-            stmt.addBatch("INSERT OR IGNORE INTO " + database + " (ID, Title) VALUES(" + Integer.valueOf(array[0]) + ", '" + array[1] + "')");
-            stmt.addBatch("UPDATE " + database + " SET Title = '" + array[1] + "' WHERE ID = " + Integer.valueOf(array[0]));
-            //stmt.addBatch("INSERT INTO " + database + " (ID, Title) VALUES (" + Integer.valueOf(array[0]) + ", '" + array[1] + "') ON DUPLICATE KEY UPDATE Title = " + array[1]);
-            //stmt.addBatch("INSERT OR REPLACE INTO " + database + " (ID, Title) VALUES (" + Integer.valueOf(array[0]) + ", '" + array[1] + "')");
-        } catch (SQLException e) {
-            System.out.println("INSERT INTO " + database + " (ID, Title) VALUES(" + Integer.valueOf(array[0]) + ", '" + /*screening*/array[1] + "')");
-            e.printStackTrace();
-        }
+    /*
+    // Добавление новых данных в другие таблицы
+    */
+    private void insertSecondaryFieldsInDB(Vacancy vacancy) {
+        insertField("City", vacancy.getContact().getCity().getId(), vacancy.getContact().getCity().getTitle());
+        insertField("Subway", vacancy.getContact().getSubway().getId(), vacancy.getContact().getSubway().getTitle());
+        insertField("Company", vacancy.getCompany().getId(), vacancy.getCompany().getTitle());
+        insertField("Education", vacancy.getEducation().getId(), vacancy.getEducation().getTitle());
+        insertField("Experience", vacancy.getExperience().getId(), vacancy.getExperience().getTitle());
+        insertField("Shedule", vacancy.getSchedule().getId(), vacancy.getSchedule().getTitle());
+        insertField("WorkingType", vacancy.getWorkingType().getId(), vacancy.getWorkingType().getTitle());
     }
 
-    private String screening(String value) {
-        if (value != null && value.contains("'")) {
-            System.out.println(value);
-            value = value.replace("'", "''");
-            System.out.println(value);
-        }
-        return value;
+    /*
+    // Добавление новых данных в другие таблицы
+    */
+    private void insertField(String database, int id, String title) {
+            try {
+                stmt.addBatch("INSERT OR IGNORE INTO " + database + " (ID, Title) VALUES(" + id + ", '" + title + "')");
+                stmt.addBatch("UPDATE " + database + " SET Title = '" + title + "' WHERE ID = " + id);
+            } catch (SQLException e) {
+                System.out.println("INSERT INTO " + database + " (ID, Title) VALUES(" + id + ", '" + title + "')");
+                e.printStackTrace();
+            }
     }
 
+    /*
+    // Проверка, требуется ли обновление вакансии из БД
     // return 0 - insert new vacancy, 1 - update vacancy, 2 - skip vacancy
-    public int checkUpdate(Vacancy vacancy) {
+    */
+    public synchronized int checkUpdate(ID vacancy) {
         try {
             checkUpdate.setInt(1, vacancy.getId());
             ResultSet resultSet = checkUpdate.executeQuery();
@@ -127,19 +221,19 @@ public class DataBase {
             while(resultSet.next()) {
                 dateTime = resultSet.getString("Date_Time");
             }
-            if (dateTime != null && !vacancy.getDateTime().equals(dateTime)) {
-                return 1;
-            } else if (dateTime != null && vacancy.getDateTime().equals(dateTime)) {
-                return 2;
-            } else if (dateTime == null) return 0;
+            if (dateTime == null) return 0;
+            else if (!vacancy.getPublication().getDateTime().equals(dateTime)) return 1;
+            else if (vacancy.getPublication().getDateTime().equals(dateTime)) return 2;
         } catch (SQLException e) {
             e.printStackTrace();
-            return 2;
         }
         return 2;
     }
 
-    public void update(Vacancy vacancy) {
+    /*
+    // Обновление данных в таблице "Vacancy"
+    */
+    private void updateVacancy(Vacancy vacancy) {
         try {
             update.setString(1, vacancy.getHeader());
             update.setString(2, vacancy.getDateTime());
@@ -153,7 +247,16 @@ public class DataBase {
             update.setInt(10, vacancy.getExperience().getId());
             update.setInt(11, 1);
             update.setInt(12, vacancy.getId());
+        } catch (SQLException e) {
+            e.printStackTrace();
+        }
+    }
 
+    /*
+    // Обновление данных в таблице "Contacts"
+    */
+    private void updateContact(Vacancy vacancy) {
+        try {
             updateContact.setString(1, vacancy.getContact().getName());
             updateContact.setInt(2, vacancy.getContact().getCity().getId());
             updateContact.setInt(3, vacancy.getContact().getSubway().getId());
@@ -166,24 +269,27 @@ public class DataBase {
         }
     }
 
-    public void updateStatus(Vacancy vacancy, int status) {
+    /*
+    // Обновление статуса (поле "Update_Status" в БД)
+    */
+    public synchronized void updateStatus(Vacancy vacancy, int status) {
         try {
             updateStatus.setInt(1, status);
             updateStatus.setInt(2, vacancy.getId());
+            updateStatus.addBatch();
         } catch (SQLException e) {
             e.printStackTrace();
         }
     }
 
-    public int delete(int status) {
+    /*
+    // Удаление неактуальных вакансий из БД (если Update_Status = 0)
+    */
+    private int delete(int status) {
         int count = 0;
         try {
-            conn.setAutoCommit(false);
             delete.setInt(1, status);
             count = delete.executeUpdate();
-            conn.commit();
-            updateStatusAfterParsing.setInt(1, status);
-            updateStatusAfterParsing.executeUpdate();
             conn.commit();
         } catch (SQLException e) {
             e.printStackTrace();
@@ -191,7 +297,23 @@ public class DataBase {
         return count;
     }
 
-    public int getCountAll() {
+    /*
+    // Обновление статуса у актуальных вакансий в БД (установить Update_Status = 0)
+    */
+    private void updateStatusAfterParsing(int status) {
+        try {
+            updateStatusAfterParsing.setInt(1, status);
+            updateStatusAfterParsing.executeUpdate();
+            conn.commit();
+        } catch (SQLException e) {
+            e.printStackTrace();
+        }
+    }
+
+    /*
+    // Получить общее число вакансий в БД
+    */
+    private int getCountAll() {
         int count = 0;
         try {
             ResultSet resultSet = countAll.executeQuery();
@@ -203,7 +325,10 @@ public class DataBase {
         return count;
     }
 
-    public void disconnect() {
+    /*
+    // Отключиться от БД
+    */
+    private void disconnect() {
         try {
             conn.close();
         } catch (SQLException e) {
@@ -211,31 +336,18 @@ public class DataBase {
         }
     }
 
-    public Connection getConn() {
-        return conn;
-    }
-
-    public PreparedStatement getInsert() {
-        return insert;
-    }
-
-    public PreparedStatement getUpdate() {
-        return update;
-    }
-
-    public PreparedStatement getUpdateStatus() {
-        return updateStatus;
-    }
-
-    public PreparedStatement getInsertContact() {
-        return insertContact;
-    }
-
-    public PreparedStatement getUpdateContact() {
-        return updateContact;
-    }
-
-    public Statement getStmt() {
-        return stmt;
+    /*
+    // Печать отчета по обновлению БД
+    */
+    public void printReport(Date startTime, Date finishTime, int countError) {
+        System.out.println("-----------------------------------------------");
+        System.out.println("Всего вакансий в базе: " + count);
+        System.out.println("Добавлено: " + countAdd);
+        System.out.println("Обновлено: " + countUpdate);
+        System.out.println("Удалено: " + countDelete);
+        System.out.println("Без изменений: " + countSkip);
+        System.out.println("Ошибки парсинга: " + countError);
+        System.out.println("Затраченное время: " + (finishTime.getTime() - startTime.getTime()) + " мс");
+        System.out.println("-----------------------------------------------");
     }
 }

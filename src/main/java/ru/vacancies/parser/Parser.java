@@ -9,16 +9,11 @@ import java.io.IOException;
 import java.io.InputStreamReader;
 import java.lang.reflect.Field;
 import java.net.URL;
-import java.sql.BatchUpdateException;
-import java.sql.SQLException;
 import java.util.Date;
-import java.util.HashMap;
-import java.util.Map;
 import java.util.Vector;
 import java.util.concurrent.*;
 
 public class Parser {
-
     /*
     // API количества вакансий в списке
     // https://api.zp.ru/v1/vacancies?offset=0&geo_id=994&limit=0
@@ -53,41 +48,34 @@ public class Parser {
 
     private Vector<ID> resultIDList = new Vector<>();
     private Vector<Vacancy> vacanciesList = new Vector<>();
-    private HashMap<String, String[]> map = new HashMap<>();
+    private DataBase dataBase = new DataBase(); //TODO Написать интерфейс для БД. Создавать интерфейс, а не объект DataBase.
     private int count;
     private int offset = 0;
-    private int countAll = 0;
-    private int countAdd = 0;
-    private int countUpdate = 0;
-    private int countDelete = 0;
-    private int countSkip = 0;
     private int countError = 0;
     private CountDownLatch cdl;
     private CountDownLatch cdlID;
-    private Date finishTime;
-    private Date startTime;
 
     /*
     // Запуск парсинга
     */
     public void startParsing() {
-        startTime = new Date();
+        Date startTime = new Date();
         System.out.println(startTime + " Запуск парсинга");
         getCount();
         parseIDList();
         parseVacancy(resultIDList);
-        updateDataBase(vacanciesList);
-        finishTime = new Date();
+        dataBase.updateDataBase(vacanciesList);
+        Date finishTime = new Date();
         System.out.println(finishTime + " Парсинг завершен");
-        printReport();
+        dataBase.printReport(startTime, finishTime, countError);
     }
 
     /*
     // Получаем общее количество вакансий на данный момент
     */
     private void getCount() {
-        count = getIDList(API + "?offset=0&geo_id=994&limit=0").metaData.getResultSet().getCount();
-        System.out.println(new Date() + " Всего найдено вакансий: " + count);
+        count = getIDList(API + "?offset=" + offset + "&geo_id=" + GEO_ID + "&limit=0").metaData.getResultSet().getCount(); //TODO Добавить проверку на null.
+        System.out.println(new Date() + " Всего найдено вакансий: " + count); //TODO Изменить формулировки для всего процесса парсинга.
     }
 
     /*
@@ -98,16 +86,27 @@ public class Parser {
         cdlID = new CountDownLatch(count / LIMITS_COUNT + 1);
         ExecutorService serviceParsingIDList = Executors.newFixedThreadPool(THREADS_COUNT);
 
-        do {
+        while (offset <= count / LIMITS_COUNT * LIMITS_COUNT) {
             final int finalOffset = offset;
             serviceParsingIDList.submit((Runnable) () -> {
+                //TODO Может быть есть более удачный способ создания ссылки, чем конкатенация из 7 фрагментов. Изучить вопрос.
                 IDList tempIDList = getIDList(API + "?offset=" + finalOffset + "&geo_id=" + GEO_ID + "&limit=" + LIMITS_COUNT);
-                resultIDList.addAll(tempIDList.list);
+                int status;
+                if (tempIDList != null) {
+                    for (ID id : tempIDList.list) {
+                        status = dataBase.checkUpdate(id);
+                        if (status == 0 || status == 1) {
+                            id.setStatus(status);
+                            resultIDList.add(id);
+                        } else {
+                            dataBase.updateStatus(new Vacancy(id.getId()), 1);
+                        }
+                    }
+                }
                 cdlID.countDown();
             });
             offset += LIMITS_COUNT;
-        } while (offset <= count / LIMITS_COUNT * LIMITS_COUNT);
-
+        }
         try {
             cdlID.await(TIMEOUT, TimeUnit.MILLISECONDS);
             serviceParsingIDList.shutdown();
@@ -129,6 +128,8 @@ public class Parser {
                 VacancyList vacancyList = getVacancyList(API + "/" + id.getId() + "?geo_id=" + GEO_ID);
                 if (vacancyList != null) {
                     Vacancy vacancy = vacancyList.list.get(0);
+                    vacancy.setDateTime(id.getPublication().getDateTime());
+                    vacancy.setStatus(id.getStatus());
                     checkEmptyFields(vacancy);
                     checkSymbol(vacancy);
                     checkPhoneList(vacancy);
@@ -186,10 +187,10 @@ public class Parser {
             while ((read = reader.read(chars)) != -1) buffer.append(chars, 0, read);
             return buffer.toString();
         } catch (FileNotFoundException e){
-            System.out.println("Страница не найдена: " + urlString + " : 404");
+            System.out.println(new Date() + " Страница не найдена: " + urlString + " : 404");
             return null;
         } catch (IOException e) {
-            System.out.println("Ошибка открытия страницы. Повторная попытка: " + urlString);
+            System.out.println(new Date() + " Ошибка открытия страницы. Повторная попытка: " + urlString);
             return readUrl(urlString);
         } finally{
             if (reader != null) reader.close();
@@ -234,105 +235,31 @@ public class Parser {
     // Иначе наблюдаются проблемы с записью в БД
     */
     private void checkSymbol(Vacancy vacancy) {
-        if (vacancy.getContact().getCity().getTitle() != null && vacancy.getContact().getCity().getTitle().contains("'"))
-            vacancy.getContact().getCity().setTitle(vacancy.getContact().getCity().getTitle().replace("'", "''"));
-        if (vacancy.getContact().getCity().getTitle() != null && vacancy.getContact().getCity().getTitle().contains("'"))
-            vacancy.getContact().getCity().setTitle(vacancy.getContact().getCity().getTitle().replace("'", "''"));
-        if (vacancy.getContact().getSubway().getTitle() != null && vacancy.getContact().getSubway().getTitle().contains("'"))
-            vacancy.getContact().getSubway().setTitle(vacancy.getContact().getSubway().getTitle().replace("'", "''"));
-        if (vacancy.getCompany().getTitle() != null && vacancy.getCompany().getTitle().contains("'"))
-            vacancy.getCompany().setTitle(vacancy.getCompany().getTitle().replace("'", "''"));
-        if (vacancy.getEducation().getTitle() != null && vacancy.getEducation().getTitle().contains("'"))
-            vacancy.getEducation().setTitle(vacancy.getEducation().getTitle().replace("'", "''"));
-        if (vacancy.getExperience().getTitle() != null && vacancy.getExperience().getTitle().contains("'"))
-            vacancy.getExperience().setTitle(vacancy.getExperience().getTitle().replace("'", "''"));
-        if (vacancy.getSchedule().getTitle() != null && vacancy.getSchedule().getTitle().contains("'"))
-            vacancy.getSchedule().setTitle(vacancy.getSchedule().getTitle().replace("'", "''"));
-        if (vacancy.getWorkingType().getTitle() != null && vacancy.getWorkingType().getTitle().contains("'"))
-            vacancy.getWorkingType().setTitle(vacancy.getWorkingType().getTitle().replace("'", "''"));
-    }
+        String title = vacancy.getHeader();
+        if (title != null && title.contains("'")) vacancy.setHeader(title.replace("'", "''"));
 
-    /*
-    // Обновление данных в БД
-    */
-    private void updateDataBase(Vector<Vacancy> vacanciesList) {
-        System.out.println(new Date() + " Начинаем обновление базы данных");
-        DataBase dataBase = new DataBase();
-        Vacancy vac = null;
-        try {
-            int i = 0;
-            dataBase.getConn().setAutoCommit(false);
-            for (Vacancy vacancy : vacanciesList) {
-                vac = vacancy;
-                int status = dataBase.checkUpdate(vacancy);
-                if (status == 0) {
-                    dataBase.insert(vacancy);
-                    dataBase.getInsert().addBatch();
-                    dataBase.getInsertContact().addBatch();
-                    map.put("City", new String[]{String.valueOf(vacancy.getContact().getCity().getId()), vacancy.getContact().getCity().getTitle()});
-                    map.put("Subway", new String[]{String.valueOf(vacancy.getContact().getSubway().getId()), vacancy.getContact().getSubway().getTitle()});
-                    map.put("Company", new String[]{String.valueOf(vacancy.getCompany().getId()), vacancy.getCompany().getTitle()});
-                    map.put("Education", new String[]{String.valueOf(vacancy.getEducation().getId()), vacancy.getEducation().getTitle()});
-                    map.put("Experience", new String[]{String.valueOf(vacancy.getExperience().getId()), vacancy.getExperience().getTitle()});
-                    map.put("Shedule", new String[]{String.valueOf(vacancy.getSchedule().getId()), vacancy.getSchedule().getTitle()});
-                    map.put("WorkingType", new String[]{String.valueOf(vacancy.getWorkingType().getId()), vacancy.getWorkingType().getTitle()});
-                    for(Map.Entry<String, String[]> entry : map.entrySet()) {
-                        String key = entry.getKey();
-                        String[] value = entry.getValue();
-                        dataBase.insertDirectory(key, value);
-                    }
-                    countAdd++;
-                } else if (status == 1) {
-                    dataBase.update(vacancy);
-                    dataBase.getUpdate().addBatch();
-                    dataBase.getUpdateContact().addBatch();
-                    countUpdate++;
-                } else if (status == 2) {
-                    dataBase.updateStatus(vacancy, 1);
-                    dataBase.getUpdateStatus().addBatch();
-                    countSkip++;
-                }
-                i++;
-                if (i % 1000 == 0 || i == vacanciesList.size()) {
-                    System.out.println("Обработано записей: " + i);
-                    try {
-                        dataBase.getStmt().executeBatch();
-                        dataBase.getInsert().executeBatch();
-                        dataBase.getInsertContact().executeBatch();
-                        dataBase.getUpdate().executeBatch();
-                        dataBase.getUpdateContact().executeBatch();
-                        dataBase.getUpdateStatus().executeBatch();
-                    } catch (BatchUpdateException e) {
-                        System.out.print("Ошибка записи в БД: ");
-                        System.out.println(vac != null ? vac.getId() : 0);
-                    }
-                    dataBase.getConn().commit();
-                }
-            }
-            dataBase.getConn().setAutoCommit(true);
-            countDelete = dataBase.delete(0);
-            countAll = dataBase.getCountAll();
-        } catch (SQLException e) {
-            System.out.println(vac != null ? vac.getId() : 0);
-            e.printStackTrace();
-        } finally {
-            dataBase.disconnect();
-            System.out.println(new Date() + " База обновлена");
-        }
-    }
+        title = vacancy.getDescription();
+        if (title != null && title.contains("'")) vacancy.setDescription(title.replace("'", "''"));
 
-    /*
-    // Печать отчета по обновлению БД
-    */
-    private void printReport() {
-        System.out.println("-----------------------------------------------");
-        System.out.println("Всего вакансий в базе: " + countAll);
-        System.out.println("Добавлено: " + countAdd);
-        System.out.println("Обновлено: " + countUpdate);
-        System.out.println("Удалено: " + countDelete);
-        System.out.println("Без изменений: " + countSkip);
-        System.out.println("Ошибки парсинга: " + countError);
-        System.out.println("Затраченное время: " + (finishTime.getTime() - startTime.getTime()) + " мс");
-        System.out.println("-----------------------------------------------");
+        title = vacancy.getContact().getCity().getTitle();
+        if (title != null && title.contains("'")) vacancy.getContact().getCity().setTitle(title.replace("'", "''"));
+
+        title = vacancy.getContact().getSubway().getTitle();
+        if (title != null && title.contains("'")) vacancy.getContact().getSubway().setTitle(title.replace("'", "''"));
+
+        title = vacancy.getCompany().getTitle();
+        if (title != null && title.contains("'")) vacancy.getCompany().setTitle(title.replace("'", "''"));
+
+        title = vacancy.getEducation().getTitle();
+        if (title != null && title.contains("'")) vacancy.getEducation().setTitle(title.replace("'", "''"));
+
+        title = vacancy.getExperience().getTitle();
+        if (title != null && title.contains("'")) vacancy.getExperience().setTitle(title.replace("'", "''"));
+
+        title = vacancy.getSchedule().getTitle();
+        if (title != null && title.contains("'")) vacancy.getSchedule().setTitle(title.replace("'", "''"));
+
+        title = vacancy.getWorkingType().getTitle();
+        if (title != null && title.contains("'")) vacancy.getWorkingType().setTitle(title.replace("'", "''"));
     }
 }
