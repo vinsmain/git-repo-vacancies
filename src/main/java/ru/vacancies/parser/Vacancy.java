@@ -35,14 +35,19 @@ public class Vacancy {
     @SerializedName("contact")
     private Contact contact;
 
-    @SerializedName("mod_date")
-    private String dateTime;
-
     @SerializedName("company")
     private Company company;
 
-    public Vacancy(int ID, String header, Education education, Experience experience, WorkingType workingType, Schedule schedule, String description, Contact contact, String dateTime, Company company, int salaryMin, int salaryMax) {
-        this.id = ID;
+    private int status;
+
+    private String dateTime;
+
+    public Vacancy(int id) {
+        this.id = id;
+    }
+
+    public Vacancy(int id, String header, Education education, Experience experience, WorkingType workingType, Schedule schedule, String description, Contact contact, Company company, int salaryMin, int salaryMax) {
+        this.id = id;
         this.header = header;
         this.education = education;
         this.experience = experience;
@@ -50,7 +55,6 @@ public class Vacancy {
         this.schedule = schedule;
         this.description = description;
         this.contact = contact;
-        this.dateTime = dateTime;
         this.company = company;
         this.salaryMin = salaryMin;
         this.salaryMax = salaryMax;
@@ -102,5 +106,25 @@ public class Vacancy {
 
     public Company getCompany() {
         return company;
+    }
+
+    public int getStatus() {
+        return status;
+    }
+
+    public void setStatus(int status) {
+        this.status = status;
+    }
+
+    public void setDateTime(String dateTime) {
+        this.dateTime = dateTime;
+    }
+
+    public void setHeader(String header) {
+        this.header = header;
+    }
+
+    public void setDescription(String description) {
+        this.description = description;
     }
 }
