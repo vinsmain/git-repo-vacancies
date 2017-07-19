@@ -75,14 +75,14 @@ public class Parser {
     */
     private void getCount() {
         count = getIDList(API + "?offset=" + offset + "&geo_id=" + GEO_ID + "&limit=0").metaData.getResultSet().getCount(); //TODO Добавить проверку на null.
-        System.out.println(new Date() + " Всего найдено вакансий: " + count); //TODO Изменить формулировки для всего процесса парсинга.
+        System.out.println(new Date() + " Всего найдено вакансий: " + count);
     }
 
     /*
     // Получаем список ID всех вакансий
     */
     private void parseIDList() {
-        System.out.println(new Date() + " Начинаем формировать список ID всех вакансий");
+        System.out.println(new Date() + " Начинаем формировать список вакансий, требующих обновления");
         cdlID = new CountDownLatch(count / LIMITS_COUNT + 1);
         ExecutorService serviceParsingIDList = Executors.newFixedThreadPool(THREADS_COUNT);
 
@@ -110,7 +110,7 @@ public class Parser {
         try {
             cdlID.await(TIMEOUT, TimeUnit.MILLISECONDS);
             serviceParsingIDList.shutdown();
-            System.out.println(new Date() + " Список ID всех вакансий сформирован. Всего ID: " + resultIDList.size());
+            System.out.println(new Date() + " Список вакансий, требующих обновления сформирован. Всего вакансий в списке: " + resultIDList.size());
         } catch (InterruptedException e) {
             e.printStackTrace();
         }
@@ -120,7 +120,7 @@ public class Parser {
     // Получаем список всех вакансий
     */
     private void parseVacancy(Vector<ID> resultIDList) {
-        System.out.println(new Date() + " Начинаем парсинг всех вакансий");
+        System.out.println(new Date() + " Начинаем получение данных по вакансиям");
         ExecutorService service = Executors.newFixedThreadPool(THREADS_COUNT);
         cdl = new CountDownLatch(resultIDList.size());
         for (ID id : resultIDList) {
@@ -141,7 +141,7 @@ public class Parser {
         try {
             cdl.await(TIMEOUT, TimeUnit.MILLISECONDS);
             service.shutdown();
-            System.out.println(new Date() + " Парсинг вакансий завершен. Всего получено вакансий: " + vacanciesList.size());
+            System.out.println(new Date() + " Получение данных завершено. Всего получено вакансий: " + vacanciesList.size());
         } catch (InterruptedException e) {
             e.printStackTrace();
         }
