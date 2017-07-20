@@ -2,14 +2,14 @@ package ru.vacancies.database;
 
 import org.sqlite.SQLiteConfig;
 import org.sqlite.SQLiteOpenMode;
-import ru.vacancies.parser.ID;
-import ru.vacancies.parser.Vacancy;
+import ru.vacancies.parser.model.ID;
+import ru.vacancies.parser.model.Vacancy;
 import java.sql.*;
 import java.sql.ResultSet;
 import java.util.*;
 import java.util.Date;
 
-public class DataBase {
+public class DataBase implements DataBaseInterface {
 
     /*
     // Update_Status
@@ -33,6 +33,9 @@ public class DataBase {
     private int countUpdate = 0;
     private int countDelete = 0;
     private int countSkip = 0;
+    private int successCount = 0;
+    private int failDBWrite = 0;
+    private int notAvailable = 0;
 
     public DataBase() {
         connect();
@@ -43,7 +46,7 @@ public class DataBase {
     // Создание необходимых таблиц, если таковые отсутствуют
     // Инициализация основных запросов
     */
-    public void connect() {
+    private void connect() {
         try {
             Class.forName("org.sqlite.JDBC");
             SQLiteConfig config = new SQLiteConfig();
@@ -120,9 +123,18 @@ public class DataBase {
                         updateContact.executeBatch();
                         updateStatus.executeBatch();
                     } catch (BatchUpdateException e) {
-                        System.out.print("Ошибка записи в БД: ");
-                        System.out.println(vac != null ? vac.getId() : 0);
-                        e.printStackTrace();
+                        int[] updateCounts = e.getUpdateCounts();
+                        for (int j = 0; j < updateCounts.length; j++) {
+                            if (updateCounts[j] >= 0) {
+                                successCount++;
+                            } else if (updateCounts[j] == Statement.SUCCESS_NO_INFO) {
+                                notAvailable++;
+                            } else if (updateCounts[j] == Statement.EXECUTE_FAILED) {
+                                failDBWrite++;
+                                //Код ошибки: i - партия записей из 1000 штук (2000: запись 1001 - 2000 вакансии), j - запись конкретной вакансии из партии
+                                System.out.println(new Date() + " Ошибка записи в БД. Код " + i + "-" + j);
+                            }
+                        }
                     }
                     conn.commit();
                 }
@@ -131,7 +143,7 @@ public class DataBase {
             updateStatusAfterParsing(0);
             count = getCountAll();
         } catch (SQLException e) {
-            System.out.println(vac != null ? vac.getId() : 0); //TODO Доработать сообщение об ошибке. Сейчас выводится id не той вакансии, из-за которой произошла ошибка.
+            System.out.println("Ошибка записи в БД: ID " + (vac != null ? vac.getId() : 0));
             e.printStackTrace();
         } finally {
             try {
@@ -339,7 +351,7 @@ public class DataBase {
     /*
     // Печать отчета по обновлению БД
     */
-    public void printReport(Date startTime, Date finishTime, int countError) {
+    public void printReport(int countError) {
         System.out.println("-----------------------------------------------");
         System.out.println("Всего вакансий в базе: " + count);
         System.out.println("Добавлено: " + countAdd);
@@ -347,7 +359,7 @@ public class DataBase {
         System.out.println("Удалено: " + countDelete);
         System.out.println("Без изменений: " + countSkip);
         System.out.println("Ошибки парсинга: " + countError);
-        System.out.println("Затраченное время: " + (finishTime.getTime() - startTime.getTime()) + " мс");
+        System.out.println("Ошибки записи данных в базу: " + failDBWrite);
         System.out.println("-----------------------------------------------");
     }
 }

@@ -1,6 +1,6 @@
 package ru.vacancies.parser.model;
 
-public class Subway extends Model {
+public class Subway extends SecondaryField {
 
     public Subway() {
     }

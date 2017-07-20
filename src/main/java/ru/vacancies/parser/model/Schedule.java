@@ -1,6 +1,6 @@
 package ru.vacancies.parser.model;
 
-public class Schedule extends Model {
+public class Schedule extends SecondaryField {
 
     public Schedule() {
     }

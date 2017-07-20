@@ -2,7 +2,14 @@ package ru.vacancies.parser;
 
 import com.google.gson.Gson;
 import ru.vacancies.database.DataBase;
+import ru.vacancies.database.DataBaseInterface;
+import ru.vacancies.parser.exception.TimeOutException;
+import ru.vacancies.parser.lists.IDList;
+import ru.vacancies.parser.lists.VacancyList;
 import ru.vacancies.parser.model.ContactPhone;
+import ru.vacancies.parser.model.ID;
+import ru.vacancies.parser.model.Vacancy;
+
 import java.io.BufferedReader;
 import java.io.FileNotFoundException;
 import java.io.IOException;
@@ -46,10 +53,15 @@ public class Parser {
     */
     private final int TIMEOUT = 60000;
 
+    /*
+    // Число попыток подключения к API
+    */
+    private final int CONNECT_COUNT = 10;
+
     private Vector<ID> resultIDList = new Vector<>();
     private Vector<Vacancy> vacanciesList = new Vector<>();
-    private DataBase dataBase = new DataBase(); //TODO Написать интерфейс для БД. Создавать интерфейс, а не объект DataBase.
-    private int count;
+    private DataBaseInterface dataBase = new DataBase();
+    private int count = 0;
     private int offset = 0;
     private int countError = 0;
     private CountDownLatch cdl;
@@ -61,28 +73,39 @@ public class Parser {
     public void startParsing() {
         Date startTime = new Date();
         System.out.println(startTime + " Запуск парсинга");
-        getCount();
-        parseIDList();
-        parseVacancy(resultIDList);
-        dataBase.updateDataBase(vacanciesList);
+        count = getCount();
+        if (count != 0) {
+            parseIDList();
+            if (resultIDList.size() != 0) {
+                parseVacancy(resultIDList);
+                dataBase.updateDataBase(vacanciesList);
+                dataBase.printReport(countError);
+            }
+        }
         Date finishTime = new Date();
-        System.out.println(finishTime + " Парсинг завершен");
-        dataBase.printReport(startTime, finishTime, countError);
+        System.out.println(finishTime + " Парсинг завершен за " + (finishTime.getTime() - startTime.getTime()) + " мс");
     }
 
     /*
     // Получаем общее количество вакансий на данный момент
     */
-    private void getCount() {
-        count = getIDList(API + "?offset=" + offset + "&geo_id=" + GEO_ID + "&limit=0").metaData.getResultSet().getCount(); //TODO Добавить проверку на null.
-        System.out.println(new Date() + " Всего найдено вакансий: " + count); //TODO Изменить формулировки для всего процесса парсинга.
+    private int getCount() {
+        int count;
+        IDList list = getIDList(API + "?offset=" + offset + "&geo_id=" + GEO_ID + "&limit=0");
+        if (list != null) {
+            count = list.metaData.getResultSet().getCount();
+        } else {
+            count = 0;
+        }
+        System.out.println(new Date() + " Всего найдено вакансий: " + count);
+        return count;
     }
 
     /*
     // Получаем список ID всех вакансий
     */
     private void parseIDList() {
-        System.out.println(new Date() + " Начинаем формировать список ID всех вакансий");
+        System.out.println(new Date() + " Начинаем формировать список вакансий, требующих обновления");
         cdlID = new CountDownLatch(count / LIMITS_COUNT + 1);
         ExecutorService serviceParsingIDList = Executors.newFixedThreadPool(THREADS_COUNT);
 
@@ -110,7 +133,7 @@ public class Parser {
         try {
             cdlID.await(TIMEOUT, TimeUnit.MILLISECONDS);
             serviceParsingIDList.shutdown();
-            System.out.println(new Date() + " Список ID всех вакансий сформирован. Всего ID: " + resultIDList.size());
+            System.out.println(new Date() + " Список вакансий, требующих обновления сформирован. Всего вакансий в списке: " + resultIDList.size());
         } catch (InterruptedException e) {
             e.printStackTrace();
         }
@@ -120,7 +143,7 @@ public class Parser {
     // Получаем список всех вакансий
     */
     private void parseVacancy(Vector<ID> resultIDList) {
-        System.out.println(new Date() + " Начинаем парсинг всех вакансий");
+        System.out.println(new Date() + " Начинаем получение данных по вакансиям");
         ExecutorService service = Executors.newFixedThreadPool(THREADS_COUNT);
         cdl = new CountDownLatch(resultIDList.size());
         for (ID id : resultIDList) {
@@ -141,7 +164,7 @@ public class Parser {
         try {
             cdl.await(TIMEOUT, TimeUnit.MILLISECONDS);
             service.shutdown();
-            System.out.println(new Date() + " Парсинг вакансий завершен. Всего получено вакансий: " + vacanciesList.size());
+            System.out.println(new Date() + " Получение данных завершено. Всего получено вакансий: " + vacanciesList.size());
         } catch (InterruptedException e) {
             e.printStackTrace();
         }
@@ -152,7 +175,7 @@ public class Parser {
     */
     private IDList getIDList(String url) {
         try {
-            String json = readUrl(url);
+            String json = readUrl(url, CONNECT_COUNT);
             return new Gson().fromJson(json, IDList.class);
         } catch (Exception e) {
             e.printStackTrace();
@@ -165,7 +188,7 @@ public class Parser {
     */
     private VacancyList getVacancyList(String url) {
         try {
-            String json = readUrl(url);
+            String json = readUrl(url, CONNECT_COUNT);
             return new Gson().fromJson(json, VacancyList.class);
         } catch (Exception e) {
             e.printStackTrace();
@@ -176,9 +199,10 @@ public class Parser {
     /*
     // Получаем JSON по ссылке
     */
-    private String readUrl(String urlString) throws Exception {
+    private String readUrl(String urlString, int connectCount) throws Exception {
         BufferedReader reader = null;
         try {
+            if (connectCount == 0) throw new TimeOutException("Превышено время ожидания ответа страницы: " + urlString + " : error 502");
             URL url = new URL(urlString);
             reader = new BufferedReader(new InputStreamReader(url.openStream()));
             StringBuilder buffer = new StringBuilder();
@@ -187,11 +211,13 @@ public class Parser {
             while ((read = reader.read(chars)) != -1) buffer.append(chars, 0, read);
             return buffer.toString();
         } catch (FileNotFoundException e){
-            System.out.println(new Date() + " Страница не найдена: " + urlString + " : 404");
+            System.out.println(new Date() + " Страница не найдена: " + urlString + " : error 404");
+            return null;
+        } catch (TimeOutException e){
+            System.out.println(new Date() + " " + e.getMessage());
             return null;
         } catch (IOException e) {
-            System.out.println(new Date() + " Ошибка открытия страницы. Повторная попытка: " + urlString);
-            return readUrl(urlString);
+            return readUrl(urlString, connectCount - 1);
         } finally{
             if (reader != null) reader.close();
         }

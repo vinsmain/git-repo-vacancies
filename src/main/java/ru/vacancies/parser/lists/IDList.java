@@ -1,6 +1,7 @@
-package ru.vacancies.parser;
+package ru.vacancies.parser.lists;
 
 import com.google.gson.annotations.SerializedName;
+import ru.vacancies.parser.model.ID;
 import ru.vacancies.parser.metadata.MetaData;
 
 import java.util.ArrayList;
