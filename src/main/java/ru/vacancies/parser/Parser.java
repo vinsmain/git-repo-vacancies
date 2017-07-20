@@ -49,7 +49,7 @@ public class Parser {
     private Vector<ID> resultIDList = new Vector<>();
     private Vector<Vacancy> vacanciesList = new Vector<>();
     private DataBase dataBase = new DataBase(); //TODO Написать интерфейс для БД. Создавать интерфейс, а не объект DataBase.
-    private int count;
+    private int count = 0;
     private int offset = 0;
     private int countError = 0;
     private CountDownLatch cdl;
@@ -61,21 +61,31 @@ public class Parser {
     public void startParsing() {
         Date startTime = new Date();
         System.out.println(startTime + " Запуск парсинга");
-        getCount();
-        parseIDList();
-        parseVacancy(resultIDList);
-        dataBase.updateDataBase(vacanciesList);
-        Date finishTime = new Date();
-        System.out.println(finishTime + " Парсинг завершен");
-        dataBase.printReport(startTime, finishTime, countError);
+        count = getCount();
+        if (count != 0) {
+            parseIDList();
+            parseVacancy(resultIDList);dataBase.updateDataBase(vacanciesList);
+            Date finishTime = new Date();
+            System.out.println(finishTime + " Парсинг завершен");
+            dataBase.printReport(startTime, finishTime, countError);
+        }
     }
 
     /*
     // Получаем общее количество вакансий на данный момент
     */
-    private void getCount() {
-        count = getIDList(API + "?offset=" + offset + "&geo_id=" + GEO_ID + "&limit=0").metaData.getResultSet().getCount(); //TODO Добавить проверку на null.
-        System.out.println(new Date() + " Всего найдено вакансий: " + count);
+    private int getCount() {
+        int count;
+        IDList list = getIDList(API + "?offset=" + offset + "&geo_id=" + GEO_ID + "&limit=0");
+        if (list != null) {
+            count = list.metaData.getResultSet().getCount();
+            System.out.println(new Date() + " Всего найдено вакансий: " + count);
+        } else {
+            count = 0;
+            System.out.println(new Date() + " Вакансий для парсинга не найдено");
+            System.out.println(new Date() + " Парсинг завершен");
+        }
+        return count;
     }
 
     /*
@@ -190,7 +200,7 @@ public class Parser {
             System.out.println(new Date() + " Страница не найдена: " + urlString + " : 404");
             return null;
         } catch (IOException e) {
-            System.out.println(new Date() + " Ошибка открытия страницы. Повторная попытка: " + urlString);
+            System.out.println(new Date() + " Ошибка открытия страницы. Повторная попытка: " + urlString); //TODO Добавить выход из рекурсии, если отсутствует интернет-соединение
             return readUrl(urlString);
         } finally{
             if (reader != null) reader.close();
