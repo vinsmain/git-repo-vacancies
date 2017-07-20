@@ -1,16 +1,16 @@
 package ru.vacancies.parser.model;
 
-public class Model {
+public class SecondaryField {
 
     private int id;
     private String title;
 
-    public Model() {
+    public SecondaryField() {
         this.id = 0;
         this.title = null;
     }
 
-    public Model(int id, String title) {
+    public SecondaryField(int id, String title) {
         this.id = id;
         this.title = title;
     }

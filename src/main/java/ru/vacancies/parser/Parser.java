@@ -2,7 +2,13 @@ package ru.vacancies.parser;
 
 import com.google.gson.Gson;
 import ru.vacancies.database.DataBase;
+import ru.vacancies.parser.exception.TimeOutException;
+import ru.vacancies.parser.lists.IDList;
+import ru.vacancies.parser.lists.VacancyList;
 import ru.vacancies.parser.model.ContactPhone;
+import ru.vacancies.parser.model.ID;
+import ru.vacancies.parser.model.Vacancy;
+
 import java.io.BufferedReader;
 import java.io.FileNotFoundException;
 import java.io.IOException;
@@ -46,6 +52,11 @@ public class Parser {
     */
     private final int TIMEOUT = 60000;
 
+    /*
+    // Число попыток подключения к API
+    */
+    private final int CONNECT_COUNT = 10;
+
     private Vector<ID> resultIDList = new Vector<>();
     private Vector<Vacancy> vacanciesList = new Vector<>();
     private DataBase dataBase = new DataBase(); //TODO Написать интерфейс для БД. Создавать интерфейс, а не объект DataBase.
@@ -64,11 +75,14 @@ public class Parser {
         count = getCount();
         if (count != 0) {
             parseIDList();
-            parseVacancy(resultIDList);dataBase.updateDataBase(vacanciesList);
-            Date finishTime = new Date();
-            System.out.println(finishTime + " Парсинг завершен");
-            dataBase.printReport(startTime, finishTime, countError);
+            if (resultIDList.size() != 0) {
+                parseVacancy(resultIDList);
+                dataBase.updateDataBase(vacanciesList);
+                dataBase.printReport(countError);
+            }
         }
+        Date finishTime = new Date();
+        System.out.println(finishTime + " Парсинг завершен за " + (finishTime.getTime() - startTime.getTime()) + " мс");
     }
 
     /*
@@ -79,12 +93,10 @@ public class Parser {
         IDList list = getIDList(API + "?offset=" + offset + "&geo_id=" + GEO_ID + "&limit=0");
         if (list != null) {
             count = list.metaData.getResultSet().getCount();
-            System.out.println(new Date() + " Всего найдено вакансий: " + count);
         } else {
             count = 0;
-            System.out.println(new Date() + " Вакансий для парсинга не найдено");
-            System.out.println(new Date() + " Парсинг завершен");
         }
+        System.out.println(new Date() + " Всего найдено вакансий: " + count);
         return count;
     }
 
@@ -162,7 +174,7 @@ public class Parser {
     */
     private IDList getIDList(String url) {
         try {
-            String json = readUrl(url);
+            String json = readUrl(url, CONNECT_COUNT);
             return new Gson().fromJson(json, IDList.class);
         } catch (Exception e) {
             e.printStackTrace();
@@ -175,7 +187,7 @@ public class Parser {
     */
     private VacancyList getVacancyList(String url) {
         try {
-            String json = readUrl(url);
+            String json = readUrl(url, CONNECT_COUNT);
             return new Gson().fromJson(json, VacancyList.class);
         } catch (Exception e) {
             e.printStackTrace();
@@ -186,9 +198,10 @@ public class Parser {
     /*
     // Получаем JSON по ссылке
     */
-    private String readUrl(String urlString) throws Exception {
+    private String readUrl(String urlString, int connectCount) throws Exception {
         BufferedReader reader = null;
         try {
+            if (connectCount == 0) throw new TimeOutException("Превышено время ожидания ответа страницы: " + urlString + " : error 502");
             URL url = new URL(urlString);
             reader = new BufferedReader(new InputStreamReader(url.openStream()));
             StringBuilder buffer = new StringBuilder();
@@ -197,11 +210,13 @@ public class Parser {
             while ((read = reader.read(chars)) != -1) buffer.append(chars, 0, read);
             return buffer.toString();
         } catch (FileNotFoundException e){
-            System.out.println(new Date() + " Страница не найдена: " + urlString + " : 404");
+            System.out.println(new Date() + " Страница не найдена: " + urlString + " : error 404");
+            return null;
+        } catch (TimeOutException e){
+            System.out.println(new Date() + " " + e.getMessage());
             return null;
         } catch (IOException e) {
-            System.out.println(new Date() + " Ошибка открытия страницы. Повторная попытка: " + urlString); //TODO Добавить выход из рекурсии, если отсутствует интернет-соединение
-            return readUrl(urlString);
+            return readUrl(urlString, connectCount - 1);
         } finally{
             if (reader != null) reader.close();
         }

@@ -1,4 +1,4 @@
-package ru.vacancies.parser;
+package ru.vacancies.parser.model;
 
 import com.google.gson.annotations.SerializedName;
 import ru.vacancies.parser.model.Publication;

@@ -2,8 +2,8 @@ package ru.vacancies.database;
 
 import org.sqlite.SQLiteConfig;
 import org.sqlite.SQLiteOpenMode;
-import ru.vacancies.parser.ID;
-import ru.vacancies.parser.Vacancy;
+import ru.vacancies.parser.model.ID;
+import ru.vacancies.parser.model.Vacancy;
 import java.sql.*;
 import java.sql.ResultSet;
 import java.util.*;
@@ -351,7 +351,7 @@ public class DataBase {
     /*
     // Печать отчета по обновлению БД
     */
-    public void printReport(Date startTime, Date finishTime, int countError) {
+    public void printReport(int countError) {
         System.out.println("-----------------------------------------------");
         System.out.println("Всего вакансий в базе: " + count);
         System.out.println("Добавлено: " + countAdd);
@@ -360,7 +360,6 @@ public class DataBase {
         System.out.println("Без изменений: " + countSkip);
         System.out.println("Ошибки парсинга: " + countError);
         System.out.println("Ошибки записи данных в базу: " + failDBWrite);
-        System.out.println("Затраченное время: " + (finishTime.getTime() - startTime.getTime()) + " мс");
         System.out.println("-----------------------------------------------");
     }
 }

@@ -1,6 +1,6 @@
 package ru.vacancies.parser.model;
 
-public class WorkingType extends Model {
+public class WorkingType extends SecondaryField {
 
     public WorkingType() {
     }
