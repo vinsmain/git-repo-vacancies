@@ -9,7 +9,7 @@ import java.sql.ResultSet;
 import java.util.*;
 import java.util.Date;
 
-public class DataBase {
+public class DataBase implements DataBaseInterface {
 
     /*
     // Update_Status
@@ -46,7 +46,7 @@ public class DataBase {
     // Создание необходимых таблиц, если таковые отсутствуют
     // Инициализация основных запросов
     */
-    public void connect() {
+    private void connect() {
         try {
             Class.forName("org.sqlite.JDBC");
             SQLiteConfig config = new SQLiteConfig();

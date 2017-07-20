@@ -2,6 +2,7 @@ package ru.vacancies.parser;
 
 import com.google.gson.Gson;
 import ru.vacancies.database.DataBase;
+import ru.vacancies.database.DataBaseInterface;
 import ru.vacancies.parser.exception.TimeOutException;
 import ru.vacancies.parser.lists.IDList;
 import ru.vacancies.parser.lists.VacancyList;
@@ -59,7 +60,7 @@ public class Parser {
 
     private Vector<ID> resultIDList = new Vector<>();
     private Vector<Vacancy> vacanciesList = new Vector<>();
-    private DataBase dataBase = new DataBase(); //TODO Написать интерфейс для БД. Создавать интерфейс, а не объект DataBase.
+    private DataBaseInterface dataBase = new DataBase();
     private int count = 0;
     private int offset = 0;
     private int countError = 0;
