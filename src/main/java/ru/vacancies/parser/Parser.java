@@ -91,7 +91,7 @@ public class Parser {
     */
     private int getCount() {
         int count;
-        IDList list = getIDList(API + "?offset=" + offset + "&geo_id=" + GEO_ID + "&limit=0");
+        IDList list = getIDList(String.format("%s?offset=%d&geo_id=%d&limit=%d", API, offset, GEO_ID, 0));
         if (list != null) {
             count = list.metaData.getResultSet().getCount();
         } else {
@@ -112,8 +112,7 @@ public class Parser {
         while (offset <= count / LIMITS_COUNT * LIMITS_COUNT) {
             final int finalOffset = offset;
             serviceParsingIDList.submit((Runnable) () -> {
-                //TODO Может быть есть более удачный способ создания ссылки, чем конкатенация из 7 фрагментов. Изучить вопрос.
-                IDList tempIDList = getIDList(API + "?offset=" + finalOffset + "&geo_id=" + GEO_ID + "&limit=" + LIMITS_COUNT);
+                IDList tempIDList = getIDList(String.format("%s?offset=%d&geo_id=%d&limit=%d", API, finalOffset, GEO_ID, LIMITS_COUNT));
                 int status;
                 if (tempIDList != null) {
                     for (ID id : tempIDList.list) {
@@ -148,7 +147,7 @@ public class Parser {
         cdl = new CountDownLatch(resultIDList.size());
         for (ID id : resultIDList) {
             service.submit((Runnable) () -> {
-                VacancyList vacancyList = getVacancyList(API + "/" + id.getId() + "?geo_id=" + GEO_ID);
+                VacancyList vacancyList = getVacancyList(String.format("%s/%d?geo_id=%d", API, id.getId(), GEO_ID));
                 if (vacancyList != null) {
                     Vacancy vacancy = vacancyList.list.get(0);
                     vacancy.setDateTime(id.getPublication().getDateTime());
