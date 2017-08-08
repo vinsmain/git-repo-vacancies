@@ -1,7 +1,6 @@
 package ru.vacancies.parser.model;
 
 import com.google.gson.annotations.SerializedName;
-import ru.vacancies.parser.model.*;
 
 public class Vacancy {
 
@@ -12,10 +11,10 @@ public class Vacancy {
     private String header;
 
     @SerializedName("salary_min")
-    private int salaryMin;
+    private long salaryMin;
 
     @SerializedName("salary_max")
-    private int salaryMax;
+    private long salaryMax;
 
     @SerializedName("education")
     private Education education;
@@ -46,7 +45,7 @@ public class Vacancy {
         this.id = id;
     }
 
-    public Vacancy(int id, String header, Education education, Experience experience, WorkingType workingType, Schedule schedule, String description, Contact contact, Company company, int salaryMin, int salaryMax) {
+    public Vacancy(int id, String header, Education education, Experience experience, WorkingType workingType, Schedule schedule, String description, Contact contact, Company company, long salaryMin, long salaryMax) {
         this.id = id;
         this.header = header;
         this.education = education;
@@ -68,11 +67,11 @@ public class Vacancy {
         return header;
     }
 
-    public int getSalaryMin() {
+    public long getSalaryMin() {
         return salaryMin;
     }
 
-    public int getSalaryMax() {
+    public long getSalaryMax() {
         return salaryMax;
     }
 

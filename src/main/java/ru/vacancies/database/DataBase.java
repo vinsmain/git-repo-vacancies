@@ -164,8 +164,8 @@ public class DataBase implements DataBaseInterface {
             insert.setInt(1, vacancy.getId());
             insert.setString(2, vacancy.getHeader());
             insert.setString(3, vacancy.getDateTime());
-            insert.setInt(4, vacancy.getSalaryMin());
-            insert.setInt(5, vacancy.getSalaryMax());
+            insert.setLong(4, vacancy.getSalaryMin());
+            insert.setLong(5, vacancy.getSalaryMax());
             insert.setInt(6, vacancy.getCompany().getId());
             insert.setInt(7, vacancy.getWorkingType().getId());
             insert.setInt(8, vacancy.getSchedule().getId());
@@ -249,8 +249,8 @@ public class DataBase implements DataBaseInterface {
         try {
             update.setString(1, vacancy.getHeader());
             update.setString(2, vacancy.getDateTime());
-            update.setInt(3, vacancy.getSalaryMin());
-            update.setInt(4, vacancy.getSalaryMax());
+            update.setLong(3, vacancy.getSalaryMin());
+            update.setLong(4, vacancy.getSalaryMax());
             update.setInt(5, vacancy.getCompany().getId());
             update.setInt(6, vacancy.getWorkingType().getId());
             update.setInt(7, vacancy.getSchedule().getId());
